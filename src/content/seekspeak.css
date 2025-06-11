@@ -1,0 +1,638 @@
+/**
+ * SeekSpeak Styles
+ * CSS for the search overlay interface
+ */
+
+/* Base overlay container - complete isolation from YouTube styles */
+.seekspeak-overlay {
+  all: initial;
+  position: fixed !important;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 10000;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-size: 14px;
+  line-height: 1.4;
+  color: #212121;
+  background: rgba(0, 0, 0, 0.75);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.2s cubic-bezier(0.4, 0.0, 0.2, 1),
+              visibility 0.2s cubic-bezier(0.4, 0.0, 0.2, 1);
+  backdrop-filter: blur(4px);
+}
+
+.seekspeak-overlay.show {
+  opacity: 1;
+  visibility: visible;
+}
+
+/* Backdrop for closing overlay */
+.seekspeak-backdrop {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  cursor: pointer;
+}
+
+/* Main modal window */
+.seekspeak-modal {
+  position: relative;
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.2), 
+              0 8px 16px rgba(0, 0, 0, 0.1);
+  width: min(650px, 90vw);
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transform: scale(0.95);
+  transition: transform 0.2s cubic-bezier(0.4, 0.0, 0.2, 1);
+}
+
+.seekspeak-overlay.show .seekspeak-modal {
+  transform: scale(1);
+}
+
+/* Header section */
+.seekspeak-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 24px 16px 24px;
+  border-bottom: 1px solid #e8eaed;
+  background: #f8f9fa;
+}
+
+.seekspeak-header h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 500;
+  color: #3c4043;
+}
+
+.seekspeak-close {
+  background: none;
+  border: none;
+  font-size: 24px;
+  line-height: 1;
+  color: #5f6368;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 50%;
+  transition: background-color 0.15s ease, color 0.15s ease;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.seekspeak-close:hover {
+  background-color: #f1f3f4;
+  color: #1a73e8;
+}
+
+/* Search input section */
+.seekspeak-search-container {
+  padding: 20px 24px 16px 24px;
+  background: #ffffff;
+}
+
+.seekspeak-input {
+  width: 100%;
+  padding: 12px 16px;
+  border: 2px solid #dadce0;
+  border-radius: 8px;
+  font-size: 16px;
+  font-family: inherit;
+  background: #ffffff;
+  color: #202124;
+  outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.seekspeak-input:focus {
+  border-color: #1a73e8;
+  box-shadow: 0 0 0 2px rgba(26, 115, 232, 0.2);
+}
+
+.seekspeak-input::placeholder {
+  color: #5f6368;
+}
+
+.seekspeak-search-info {
+  margin-top: 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.seekspeak-shortcut {
+  font-size: 12px;
+  color: #5f6368;
+}
+
+/* Results container */
+.seekspeak-results-container {
+  flex: 1;
+  min-height: 200px;
+  max-height: 400px;
+  overflow-y: auto;
+  background: #ffffff;
+  position: relative;
+}
+
+.seekspeak-results {
+  padding: 0 8px;
+}
+
+/* Individual result items */
+.seekspeak-result-item {
+  display: flex;
+  flex-direction: column;
+  padding: 12px 16px;
+  margin: 4px 0;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background-color 0.15s ease, transform 0.15s ease;
+  border: 1px solid transparent;
+}
+
+.seekspeak-result-item:hover {
+  background-color: #f8f9fa;
+  transform: translateX(2px);
+}
+
+.seekspeak-result-item.selected {
+  background-color: #e8f0fe;
+  border-color: #1a73e8;
+}
+
+.seekspeak-result-time {
+  font-size: 12px;
+  font-weight: 500;
+  color: #1a73e8;
+  margin-bottom: 4px;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+}
+
+.seekspeak-result-text {
+  font-size: 14px;
+  color: #202124;
+  line-height: 1.4;
+  margin-bottom: 4px;
+}
+
+.seekspeak-result-text mark {
+  background-color: #fbbc04;
+  color: #1f1f1f;
+  padding: 1px 2px;
+  border-radius: 2px;
+  font-weight: 500;
+}
+
+.seekspeak-result-context {
+  font-size: 12px;
+  color: #5f6368;
+  line-height: 1.3;
+  margin-top: 4px;
+}
+
+.seekspeak-result-context strong {
+  color: #202124;
+  font-weight: 500;
+}
+
+/* Loading state */
+.seekspeak-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  color: #5f6368;
+  font-size: 14px;
+}
+
+.seekspeak-spinner {
+  width: 24px;
+  height: 24px;
+  border: 2px solid #e8eaed;
+  border-top-color: #1a73e8;
+  border-radius: 50%;
+  animation: seekspeak-spin 1s linear infinite;
+  margin-bottom: 12px;
+}
+
+@keyframes seekspeak-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* No results state */
+.seekspeak-no-results {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  text-align: center;
+}
+
+.seekspeak-no-results-icon {
+  font-size: 32px;
+  margin-bottom: 12px;
+  opacity: 0.6;
+}
+
+.seekspeak-no-results-text {
+  font-size: 16px;
+  color: #3c4043;
+  margin-bottom: 8px;
+  font-weight: 500;
+}
+
+.seekspeak-no-results-hint {
+  font-size: 14px;
+  color: #5f6368;
+}
+
+/* Footer section */
+.seekspeak-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 24px;
+  border-top: 1px solid #e8eaed;
+  background: #f8f9fa;
+}
+
+.seekspeak-status {
+  font-size: 13px;
+  color: #5f6368;
+}
+
+.seekspeak-credits {
+  font-size: 12px;
+}
+
+.seekspeak-credits a {
+  color: #1a73e8;
+  text-decoration: none;
+  transition: color 0.15s ease;
+}
+
+.seekspeak-credits a:hover {
+  color: #1557b0;
+  text-decoration: underline;
+}
+
+/* Custom scrollbar */
+.seekspeak-results-container::-webkit-scrollbar {
+  width: 8px;
+}
+
+.seekspeak-results-container::-webkit-scrollbar-track {
+  background: #f1f3f4;
+  border-radius: 4px;
+}
+
+.seekspeak-results-container::-webkit-scrollbar-thumb {
+  background: #dadce0;
+  border-radius: 4px;
+  transition: background-color 0.2s ease;
+}
+
+.seekspeak-results-container::-webkit-scrollbar-thumb:hover {
+  background: #bdc1c6;
+}
+
+/* ============================================
+   DARK THEME STYLES
+   ============================================ */
+
+.seekspeak-theme-dark .seekspeak-modal {
+  background: #202124;
+  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.4), 
+              0 8px 16px rgba(0, 0, 0, 0.2);
+}
+
+.seekspeak-theme-dark .seekspeak-header {
+  background: #292a2d;
+  border-bottom-color: #3c4043;
+}
+
+.seekspeak-theme-dark .seekspeak-header h2 {
+  color: #e8eaed;
+}
+
+.seekspeak-theme-dark .seekspeak-close {
+  color: #9aa0a6;
+}
+
+.seekspeak-theme-dark .seekspeak-close:hover {
+  background-color: #3c4043;
+  color: #8ab4f8;
+}
+
+.seekspeak-theme-dark .seekspeak-search-container {
+  background: #202124;
+}
+
+.seekspeak-theme-dark .seekspeak-input {
+  background: #303134;
+  border-color: #5f6368;
+  color: #e8eaed;
+}
+
+.seekspeak-theme-dark .seekspeak-input:focus {
+  border-color: #8ab4f8;
+  box-shadow: 0 0 0 2px rgba(138, 180, 248, 0.2);
+}
+
+.seekspeak-theme-dark .seekspeak-input::placeholder {
+  color: #9aa0a6;
+}
+
+.seekspeak-theme-dark .seekspeak-shortcut {
+  color: #9aa0a6;
+}
+
+.seekspeak-theme-dark .seekspeak-results-container {
+  background: #202124;
+}
+
+.seekspeak-theme-dark .seekspeak-result-item:hover {
+  background-color: #292a2d;
+}
+
+.seekspeak-theme-dark .seekspeak-result-item.selected {
+  background-color: #1a73e8;
+  border-color: #8ab4f8;
+}
+
+.seekspeak-theme-dark .seekspeak-result-time {
+  color: #8ab4f8;
+}
+
+.seekspeak-theme-dark .seekspeak-result-text {
+  color: #e8eaed;
+}
+
+.seekspeak-theme-dark .seekspeak-result-text mark {
+  background-color: #fdd663;
+  color: #202124;
+}
+
+.seekspeak-theme-dark .seekspeak-result-context {
+  color: #9aa0a6;
+}
+
+.seekspeak-theme-dark .seekspeak-result-context strong {
+  color: #e8eaed;
+}
+
+.seekspeak-theme-dark .seekspeak-loading {
+  color: #9aa0a6;
+}
+
+.seekspeak-theme-dark .seekspeak-spinner {
+  border-color: #3c4043;
+  border-top-color: #8ab4f8;
+}
+
+.seekspeak-theme-dark .seekspeak-no-results-text {
+  color: #e8eaed;
+}
+
+.seekspeak-theme-dark .seekspeak-no-results-hint {
+  color: #9aa0a6;
+}
+
+.seekspeak-theme-dark .seekspeak-footer {
+  background: #292a2d;
+  border-top-color: #3c4043;
+}
+
+.seekspeak-theme-dark .seekspeak-status {
+  color: #9aa0a6;
+}
+
+.seekspeak-theme-dark .seekspeak-credits a {
+  color: #8ab4f8;
+}
+
+.seekspeak-theme-dark .seekspeak-credits a:hover {
+  color: #aecbfa;
+}
+
+/* Dark theme scrollbar */
+.seekspeak-theme-dark .seekspeak-results-container::-webkit-scrollbar-track {
+  background: #3c4043;
+}
+
+.seekspeak-theme-dark .seekspeak-results-container::-webkit-scrollbar-thumb {
+  background: #5f6368;
+}
+
+.seekspeak-theme-dark .seekspeak-results-container::-webkit-scrollbar-thumb:hover {
+  background: #80868b;
+}
+
+/* ============================================
+   RESPONSIVE DESIGN
+   ============================================ */
+
+/* Tablet styles */
+@media (max-width: 768px) {
+  .seekspeak-modal {
+    width: 95vw;
+    max-height: 85vh;
+    margin: 20px;
+  }
+  
+  .seekspeak-header {
+    padding: 16px 20px 12px 20px;
+  }
+  
+  .seekspeak-header h2 {
+    font-size: 16px;
+  }
+  
+  .seekspeak-search-container {
+    padding: 16px 20px 12px 20px;
+  }
+  
+  .seekspeak-input {
+    font-size: 16px; /* Prevent zoom on iOS */
+    padding: 14px 16px;
+  }
+  
+  .seekspeak-result-item {
+    padding: 14px 16px;
+  }
+  
+  .seekspeak-footer {
+    padding: 12px 20px;
+  }
+}
+
+/* Mobile styles */
+@media (max-width: 480px) {
+  .seekspeak-overlay {
+    padding: 10px;
+  }
+  
+  .seekspeak-modal {
+    width: 100%;
+    height: 100%;
+    max-height: none;
+    margin: 0;
+    border-radius: 0;
+  }
+  
+  .seekspeak-header {
+    padding: 12px 16px;
+  }
+  
+  .seekspeak-header h2 {
+    font-size: 16px;
+  }
+  
+  .seekspeak-search-container {
+    padding: 12px 16px;
+  }
+  
+  .seekspeak-input {
+    padding: 12px 14px;
+  }
+  
+  .seekspeak-result-item {
+    padding: 12px 14px;
+    margin: 2px 0;
+  }
+  
+  .seekspeak-result-time {
+    font-size: 11px;
+  }
+  
+  .seekspeak-result-text {
+    font-size: 13px;
+  }
+  
+  .seekspeak-result-context {
+    font-size: 11px;
+  }
+  
+  .seekspeak-footer {
+    padding: 10px 16px;
+  }
+  
+  .seekspeak-status {
+    font-size: 12px;
+  }
+  
+  .seekspeak-credits {
+    font-size: 11px;
+  }
+}
+
+/* Very small screens */
+@media (max-height: 600px) {
+  .seekspeak-modal {
+    max-height: 95vh;
+  }
+  
+  .seekspeak-results-container {
+    min-height: 150px;
+    max-height: 250px;
+  }
+  
+  .seekspeak-no-results {
+    padding: 20px;
+  }
+  
+  .seekspeak-loading {
+    padding: 20px;
+  }
+}
+
+/* ============================================
+   ACCESSIBILITY IMPROVEMENTS
+   ============================================ */
+
+/* Focus indicators */
+.seekspeak-result-item:focus-visible {
+  outline: 2px solid #1a73e8;
+  outline-offset: 2px;
+}
+
+.seekspeak-theme-dark .seekspeak-result-item:focus-visible {
+  outline-color: #8ab4f8;
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .seekspeak-modal {
+    border: 2px solid;
+  }
+  
+  .seekspeak-result-item {
+    border-width: 2px;
+  }
+  
+  .seekspeak-input {
+    border-width: 3px;
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .seekspeak-overlay,
+  .seekspeak-modal,
+  .seekspeak-result-item,
+  .seekspeak-close,
+  .seekspeak-input {
+    transition: none;
+  }
+  
+  .seekspeak-spinner {
+    animation: none;
+    border-top-color: transparent;
+  }
+}
+
+/* ============================================
+   UTILITY CLASSES
+   ============================================ */
+
+.seekspeak-hidden {
+  display: none !important;
+}
+
+.seekspeak-sr-only {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
+
+/* Prevent body scroll when overlay is open */
+body.seekspeak-no-scroll {
+  overflow: hidden;
+}

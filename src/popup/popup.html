@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SeekSpeak</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="popup-container">
+    <header class="popup-header">
+      <div class="popup-logo">
+        <h1>SeekSpeak</h1>
+        <span class="popup-version">v1.0.0</span>
+      </div>
+    </header>
+
+    <main class="popup-main">
+      <div class="popup-status" id="status-container">
+        <div class="status-icon" id="status-icon">⏳</div>
+        <div class="status-text" id="status-text">Checking video...</div>
+      </div>
+
+      <div class="popup-actions">
+        <button class="action-button primary" id="search-button" disabled>
+          <span class="button-icon">🔍</span>
+          <span class="button-text">Search Captions</span>
+          <span class="button-shortcut">Ctrl+Shift+F</span>
+        </button>
+      </div>
+
+      <div class="popup-info" id="video-info" style="display: none;">
+        <div class="info-item">
+          <span class="info-label">Video:</span>
+          <span class="info-value" id="video-title">Loading...</span>
+        </div>
+        <div class="info-item">
+          <span class="info-label">Captions:</span>
+          <span class="info-value" id="caption-status">Checking...</span>
+        </div>
+      </div>
+
+      <div class="popup-help">
+        <h3>How to use SeekSpeak:</h3>
+        <ol>
+          <li>Open any YouTube video with captions</li>
+          <li>Press <kbd>Ctrl+Shift+F</kbd> or click Search</li>
+          <li>Type to search captions instantly</li>
+          <li>Click results to jump to that moment</li>
+        </ol>
+      </div>
+    </main>
+
+    <footer class="popup-footer">
+      <div class="popup-links">
+        <a href="https://github.com/Dkmariolink/SeekSpeak" target="_blank" class="footer-link">
+          GitHub
+        </a>
+        <a href="https://buymeacoffee.com/dkmariolink" target="_blank" class="footer-link">
+          ☕ Support
+        </a>
+      </div>
+      <div class="popup-credits">
+        Made with ❤️ for YouTube users
+      </div>
+    </footer>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

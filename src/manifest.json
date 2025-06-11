@@ -1,0 +1,73 @@
+{
+  "manifest_version": 3,
+  "name": "SeekSpeak",
+  "version": "1.0.0",
+  "description": "Search YouTube video captions and jump to specific moments instantly",
+  
+  "permissions": [
+    "activeTab",
+    "storage"
+  ],
+  
+  "host_permissions": [
+    "https://www.youtube.com/*"
+  ],
+  
+  "content_scripts": [
+    {
+      "matches": [
+        "https://www.youtube.com/watch*",
+        "https://m.youtube.com/watch*"
+      ],
+      "js": [
+        "content/youtube-injector.js",
+        "content/caption-fetcher.js", 
+        "content/search-engine.js",
+        "content/ui-controller.js"
+      ],
+      "css": [
+        "content/seekspeak.css"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  
+  "background": {
+    "service_worker": "background/service-worker.js"
+  },
+  
+  "action": {
+    "default_popup": "popup/popup.html",
+    "default_title": "SeekSpeak - Search Video Captions",
+    "default_icon": {
+      "16": "assets/icons/icon16.png",
+      "32": "assets/icons/icon32.png",
+      "48": "assets/icons/icon48.png",
+      "128": "assets/icons/icon128.png"
+    }
+  },
+  
+  "icons": {
+    "16": "assets/icons/icon16.png",
+    "32": "assets/icons/icon32.png", 
+    "48": "assets/icons/icon48.png",
+    "128": "assets/icons/icon128.png"
+  },
+  
+  "commands": {
+    "open-search": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+F",
+        "mac": "Command+Shift+F"
+      },
+      "description": "Open caption search"
+    }
+  },
+  
+  "web_accessible_resources": [
+    {
+      "resources": ["content/seekspeak.css"],
+      "matches": ["https://www.youtube.com/*"]
+    }
+  ]
+}
