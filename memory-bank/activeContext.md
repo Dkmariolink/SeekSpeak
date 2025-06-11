@@ -9,12 +9,16 @@
 - **Next Step**: ⏳ Test extension in Chrome developer mode
 
 ### Immediate Next Steps (Priority Order)
-1. **Test Extension**: Load unpacked extension in Chrome developer mode
-2. **Debug Integration**: Fix any startup or injection issues
-3. **Test Caption Fetching**: Verify caption retrieval works on various videos
-4. **Test Search Functionality**: Ensure search and navigation work correctly
-5. **Performance Testing**: Test with long videos (1+ hour content)
-6. **User Experience Testing**: Verify keyboard shortcuts and accessibility
+1. **Create Icons**: Use Canva design brief to create icon16.png, icon32.png, icon48.png, icon128.png
+2. **Test Extension**: Load unpacked extension in Chrome developer mode
+3. **Debug Integration**: Fix any startup or injection issues
+4. **Test Caption Fetching**: Verify caption retrieval works on various videos
+5. **Test Search Functionality**: Ensure search and navigation work correctly
+6. **Performance Testing**: Test with long videos (1+ hour content)
+
+### Current Blockers
+- **Missing Icons**: Extension requires PNG icon files to load in Chrome
+- **Solution**: Use CANVA_DESIGN_BRIEF.md to create icons quickly
 
 ## Recent Decisions and Context
 
