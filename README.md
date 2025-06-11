@@ -27,13 +27,18 @@ SeekSpeak is a Chrome extension that allows users to search through YouTube vide
    cd SeekSpeak
    ```
 
-2. **Load the extension in Chrome**:
+2. **Create extension icons**:
+   - Create PNG icons: 16x16, 32x32, 48x48, 128x128 pixels
+   - Save as `icon16.png`, `icon32.png`, `icon48.png`, `icon128.png`
+   - Place in `src/assets/icons/` folder
+
+3. **Load the extension in Chrome**:
    - Open Chrome and navigate to `chrome://extensions/`
    - Enable "Developer mode" (toggle in top-right)
    - Click "Load unpacked" 
    - Select the `src` folder from this project
 
-3. **Test the extension**:
+4. **Test the extension**:
    - Go to any YouTube video with captions
    - Press `Ctrl+Shift+F` or click the SeekSpeak extension icon
    - Type to search captions instantly!
@@ -50,7 +55,7 @@ SeekSpeak is a Chrome extension that allows users to search through YouTube vide
 
 ## Development Status
 
-### ✅ Phase 1: Core Functionality (95% Complete)
+### ✅ Phase 1: Core Functionality (Complete)
 - [x] Chrome Extension Manifest V3 setup
 - [x] YouTube page detection and integration
 - [x] Caption fetching from YouTube APIs
@@ -60,7 +65,6 @@ SeekSpeak is a Chrome extension that allows users to search through YouTube vide
 - [x] Extension popup interface
 - [x] Dark/light theme support
 - [x] Keyboard shortcuts and accessibility
-- [ ] Testing and bug fixes
 
 ### 🔄 Next: Testing & Refinement
 - Load testing with various YouTube videos
@@ -92,12 +96,6 @@ SeekSpeak is open source! Contributions are welcome.
 3. Make your changes and test thoroughly
 4. Update documentation if needed
 5. Submit a pull request
-
-### Testing Guidelines
-- Test on videos with different caption types (auto-generated vs manual)
-- Verify functionality across different video lengths
-- Check responsive design on various screen sizes
-- Test keyboard navigation and accessibility features
 
 ## Support
 

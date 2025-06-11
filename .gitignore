@@ -1,0 +1,29 @@
+# SeekSpeak - Chrome Extension Repository
+
+# Development files (keep local only)
+TESTING.md
+CANVA_DESIGN_BRIEF.md
+ICON_PLACEHOLDER.md
+youtube_caption_search_design.md
+*.local.md
+
+# Temporary files
+*.tmp
+*.temp
+.DS_Store
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+
+# Node modules (if any build tools added later)
+node_modules/
+
+# Build outputs (if any build process added)
+dist/
+build/
+
+# Logs
+*.log
+npm-debug.log*
