@@ -121,8 +121,8 @@
 }
 
 .seekspeak-input:focus {
-  border-color: #1a73e8;
-  box-shadow: 0 0 0 2px rgba(26, 115, 232, 0.2);
+  border-color: #ff0000;
+  box-shadow: 0 0 0 2px rgba(255, 0, 0, 0.2);
 }
 
 .seekspeak-input::placeholder {
@@ -173,14 +173,14 @@
 }
 
 .seekspeak-result-item.selected {
-  background-color: #e8f0fe;
-  border-color: #1a73e8;
+  background-color: #ffe6e6;
+  border-color: #ff0000;
 }
 
 .seekspeak-result-time {
   font-size: 12px;
   font-weight: 500;
-  color: #1a73e8;
+  color: #ff0000;
   margin-bottom: 4px;
   font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
 }
@@ -227,7 +227,7 @@
   width: 24px;
   height: 24px;
   border: 2px solid #e8eaed;
-  border-top-color: #1a73e8;
+  border-top-color: #ff0000;
   border-radius: 50%;
   animation: seekspeak-spin 1s linear infinite;
   margin-bottom: 12px;
@@ -287,13 +287,13 @@
 }
 
 .seekspeak-credits a {
-  color: #1a73e8;
+  color: #ff0000;
   text-decoration: none;
   transition: color 0.15s ease;
 }
 
 .seekspeak-credits a:hover {
-  color: #1557b0;
+  color: #cc0000;
   text-decoration: underline;
 }
 
@@ -356,8 +356,8 @@
 }
 
 .seekspeak-theme-dark .seekspeak-input:focus {
-  border-color: #8ab4f8;
-  box-shadow: 0 0 0 2px rgba(138, 180, 248, 0.2);
+  border-color: #ff6666;
+  box-shadow: 0 0 0 2px rgba(255, 102, 102, 0.2);
 }
 
 .seekspeak-theme-dark .seekspeak-input::placeholder {
@@ -377,12 +377,12 @@
 }
 
 .seekspeak-theme-dark .seekspeak-result-item.selected {
-  background-color: #1a73e8;
-  border-color: #8ab4f8;
+  background-color: #ff0000;
+  border-color: #ff6666;
 }
 
 .seekspeak-theme-dark .seekspeak-result-time {
-  color: #8ab4f8;
+  color: #ff6666;
 }
 
 .seekspeak-theme-dark .seekspeak-result-text {
@@ -408,7 +408,7 @@
 
 .seekspeak-theme-dark .seekspeak-spinner {
   border-color: #3c4043;
-  border-top-color: #8ab4f8;
+  border-top-color: #ff6666;
 }
 
 .seekspeak-theme-dark .seekspeak-no-results-text {
@@ -429,11 +429,11 @@
 }
 
 .seekspeak-theme-dark .seekspeak-credits a {
-  color: #8ab4f8;
+  color: #ff6666;
 }
 
 .seekspeak-theme-dark .seekspeak-credits a:hover {
-  color: #aecbfa;
+  color: #ff9999;
 }
 
 /* Dark theme scrollbar */

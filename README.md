@@ -27,12 +27,7 @@ SeekSpeak is a Chrome extension that allows users to search through YouTube vide
    cd SeekSpeak
    ```
 
-2. **Create extension icons**:
-   - Create PNG icons: 16x16, 32x32, 48x48, 128x128 pixels
-   - Save as `icon16.png`, `icon32.png`, `icon48.png`, `icon128.png`
-   - Place in `src/assets/icons/` folder
-
-3. **Load the extension in Chrome**:
+2. **Load the extension in Chrome**:
    - Open Chrome and navigate to `chrome://extensions/`
    - Enable "Developer mode" (toggle in top-right)
    - Click "Load unpacked" 

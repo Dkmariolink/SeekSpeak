@@ -122,8 +122,17 @@ class PopupController {
       
     } catch (error) {
       console.error('SeekSpeak Popup: Error getting video info:', error);
-      this.setStatus('error', 'Extension not loaded on this page');
-      this.elements.captionStatus.textContent = 'Extension not active';
+      
+      // More specific error message
+      if (error.message && error.message.includes('Could not establish connection')) {
+        this.setStatus('error', 'Extension not loaded on this page');
+        this.elements.captionStatus.textContent = 'Try refreshing the page';
+        // Show troubleshooting section
+        document.getElementById('troubleshoot').style.display = 'block';
+      } else {
+        this.setStatus('error', 'Extension not active');
+        this.elements.captionStatus.textContent = 'Extension not active';
+      }
     }
   }
 
@@ -162,11 +171,11 @@ class PopupController {
     };
     
     const colors = {
-      loading: '#fbbc04',
-      ready: '#34a853',
+      loading: '#ff9800',
+      ready: '#ff0000',
       warning: '#ff9800', 
       error: '#ea4335',
-      info: '#4285f4'
+      info: '#ff0000'
     };
     
     this.elements.statusIcon.textContent = icons[type] || 'ℹ️';

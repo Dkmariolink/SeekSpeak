@@ -13,14 +13,18 @@ class YouTubeInjector {
   }
 
   async init() {
+    console.log('SeekSpeak: YouTube Injector initializing...');
+    
     // Check if we're on a YouTube video page
     this.isYouTubePage = this.detectVideoPage();
+    console.log('SeekSpeak: Is YouTube page?', this.isYouTubePage);
     
     if (this.isYouTubePage) {
       console.log('SeekSpeak: YouTube video page detected');
       
       // Get current video ID
       this.currentVideoId = this.extractVideoId();
+      console.log('SeekSpeak: Video ID:', this.currentVideoId);
       
       if (this.currentVideoId) {
         // Set up the extension for this video
@@ -31,7 +35,11 @@ class YouTubeInjector {
         
         // Listen for messages from background script
         this.setupMessageListeners();
+      } else {
+        console.warn('SeekSpeak: Could not extract video ID');
       }
+    } else {
+      console.log('SeekSpeak: Not a YouTube video page');
     }
   }
 

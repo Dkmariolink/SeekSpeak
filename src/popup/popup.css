@@ -22,7 +22,7 @@ body {
 
 /* Header */
 .popup-header {
-  background: linear-gradient(135deg, #1a73e8 0%, #4285f4 100%);
+  background: linear-gradient(135deg, #ff0000 0%, #cc0000 100%);
   color: white;
   padding: 16px 20px;
   text-align: center;
@@ -56,7 +56,7 @@ body {
   background: #f8f9fa;
   border-radius: 8px;
   margin-bottom: 20px;
-  border-left: 4px solid #4285f4;
+  border-left: 4px solid #ff0000;
 }
 
 .status-icon {
@@ -98,14 +98,14 @@ body {
 }
 
 .action-button.primary.enabled {
-  background: #1a73e8;
+  background: #ff0000;
   color: white;
 }
 
 .action-button.primary.enabled:hover {
-  background: #1557b0;
+  background: #cc0000;
   transform: translateY(-1px);
-  box-shadow: 0 2px 8px rgba(26, 115, 232, 0.3);
+  box-shadow: 0 2px 8px rgba(255, 0, 0, 0.3);
 }
 
 .button-icon {
@@ -173,7 +173,14 @@ body {
   color: #3c4043;
 }
 
-.popup-help ol {
+.popup-help h4 {
+  margin: 16px 0 8px 0;
+  font-size: 13px;
+  font-weight: 500;
+  color: #ea4335;
+}
+
+.popup-help ol, .popup-help ul {
   margin: 0;
   padding-left: 20px;
   color: #5f6368;
@@ -182,6 +189,18 @@ body {
 
 .popup-help li {
   margin-bottom: 6px;
+}
+
+.popup-help p {
+  margin: 4px 0;
+  font-size: 13px;
+  color: #5f6368;
+}
+
+.popup-troubleshoot {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid #e8eaed;
 }
 
 .popup-help kbd {
@@ -208,7 +227,7 @@ body {
 }
 
 .footer-link {
-  color: #1a73e8;
+  color: #ff0000;
   text-decoration: none;
   font-size: 13px;
   font-weight: 500;
@@ -216,7 +235,7 @@ body {
 }
 
 .footer-link:hover {
-  color: #1557b0;
+  color: #cc0000;
   text-decoration: underline;
 }
 
@@ -245,7 +264,7 @@ body {
   
   .popup-status {
     background: #292a2d;
-    border-left-color: #8ab4f8;
+    border-left-color: #ff0000;
   }
   
   .status-text {
@@ -258,7 +277,7 @@ body {
   }
   
   .action-button.primary.enabled {
-    background: #1a73e8;
+    background: #ff0000;
   }
   
   .popup-info,
@@ -279,8 +298,20 @@ body {
     color: #e8eaed;
   }
   
-  .popup-help ol {
+  .popup-help h4 {
+    color: #ff6666;
+  }
+  
+  .popup-help ol, .popup-help ul {
     color: #9aa0a6;
+  }
+  
+  .popup-help p {
+    color: #9aa0a6;
+  }
+  
+  .popup-troubleshoot {
+    border-top-color: #3c4043;
   }
   
   .popup-help kbd {
@@ -295,11 +326,11 @@ body {
   }
   
   .footer-link {
-    color: #8ab4f8;
+    color: #ff6666;
   }
   
   .footer-link:hover {
-    color: #aecbfa;
+    color: #ff9999;
   }
   
   .popup-credits {
