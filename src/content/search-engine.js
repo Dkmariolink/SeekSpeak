@@ -16,6 +16,21 @@ class SearchEngine {
     console.log('SeekSpeak: Search engine initialized');
   }
 
+  // Check if search engine is ready with indexed data
+  isReady() {
+    return this.isIndexed && this.segments.length > 0;
+  }
+
+  // Get the number of caption segments
+  getSegmentCount() {
+    return this.segments.length;
+  }
+
+  // Get all caption segments
+  getSegments() {
+    return this.segments;
+  }
+
   async buildIndex(captionData) {
     if (!captionData || !captionData.segments) {
       console.warn('SeekSpeak: No caption data to index');

@@ -109,8 +109,8 @@ class PopupController {
       if (response && response.videoId) {
         this.videoInfo = response;
         
-        // Update video info display
-        this.elements.videoTitle.textContent = this.currentTab.title || 'YouTube Video';
+        // Update video info display with actual video title
+        this.elements.videoTitle.textContent = response.videoTitle || this.currentTab.title || 'YouTube Video';
         this.elements.videoInfo.style.display = 'block';
         
         // Check if captions are available
@@ -138,26 +138,49 @@ class PopupController {
 
   async checkCaptionAvailability() {
     try {
-      // Get caption status from background script
-      const response = await chrome.runtime.sendMessage({
-        type: 'GET_CAPTIONS',
-        videoId: this.videoInfo.videoId
-      });
+      // Check caption status directly from content script
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
       
-      if (response && !response.error && response.segments) {
+      if (!tab) {
+        this.setStatus('warning', 'No active tab found');
+        return;
+      }
+
+      // Execute script in content context to check UI controller
+      const results = await chrome.scripting.executeScript({
+        target: { tabId: tab.id },
+        func: () => {
+          // Check if UI controller is available and get caption status
+          if (window.uiController && typeof window.uiController.getCaptionStatus === 'function') {
+            const status = window.uiController.getCaptionStatus();
+            console.log('SeekSpeak Popup: Caption status from UI controller:', status);
+            return status;
+          } else {
+            console.log('SeekSpeak Popup: UI controller not available');
+            return { available: false, source: null, segmentCount: 0, error: 'UI controller not found' };
+          }
+        }
+      });
+
+      const captionStatus = results && results[0] && results[0].result;
+      console.log('SeekSpeak Popup: Received caption status:', captionStatus);
+
+      if (captionStatus && captionStatus.available) {
         this.setStatus('ready', 'Ready to search captions');
-        this.elements.captionStatus.textContent = `${response.segments.length} caption segments`;
+        this.elements.captionStatus.textContent = `${captionStatus.segmentCount} caption segments found`;
         this.enableSearchButton();
         
       } else {
         this.setStatus('warning', 'No captions available for this video');
         this.elements.captionStatus.textContent = 'No captions found';
+        this.disableSearchButton();
       }
       
     } catch (error) {
       console.error('SeekSpeak Popup: Error checking captions:', error);
-      this.setStatus('warning', 'Captions status unknown');
+      this.setStatus('warning', 'Cannot check caption status');
       this.elements.captionStatus.textContent = 'Status unknown';
+      this.disableSearchButton();
     }
   }
 

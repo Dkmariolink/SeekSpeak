@@ -11,6 +11,7 @@ class UIController {
     this.selectedResultIndex = -1;
     this.searchTimeout = null;
     this.themeDetector = null;
+    this.captionsAvailable = false; // Track caption availability
   }
 
   async init() {
@@ -32,32 +33,86 @@ class UIController {
   async waitForCaptions() {
     console.log('SeekSpeak: UI Controller checking for caption data');
     
-    // Check if captions are already available
+    // Check multiple sources for captions
     const captionData = window.captionFetcher?.getCurrentCaptions();
+    const searchEngine = window.searchEngine;
+    const hasSearchIndex = searchEngine && searchEngine.isReady && searchEngine.isReady();
     
-    if (captionData) {
-      console.log('SeekSpeak: Caption data already available');
+    console.log('SeekSpeak: Caption data from fetcher:', !!captionData);
+    console.log('SeekSpeak: Search engine ready:', !!hasSearchIndex);
+    
+    if (captionData || hasSearchIndex) {
+      console.log('SeekSpeak: Caption data available - UI ready');
+      this.captionsAvailable = true;
       return;
     }
     
     // Wait a bit more for captions to be fetched
-    const maxWait = 5000; // 5 seconds
+    const maxWait = 8000; // Increased to 8 seconds
     const startTime = Date.now();
     
     const checkCaptions = () => {
       const captionData = window.captionFetcher?.getCurrentCaptions();
+      const searchEngine = window.searchEngine;
+      const hasSearchIndex = searchEngine && searchEngine.isReady && searchEngine.isReady();
       
-      if (captionData) {
-        console.log('SeekSpeak: Caption data now available');
+      console.log('SeekSpeak: Checking - Captions:', !!captionData, 'Search:', !!hasSearchIndex);
+      
+      if (captionData || hasSearchIndex) {
+        console.log('SeekSpeak: Caption data now available - UI ready');
+        this.captionsAvailable = true;
         return;
       } else if (Date.now() - startTime < maxWait) {
         setTimeout(checkCaptions, 500);
       } else {
         console.warn('SeekSpeak: UI Controller timed out waiting for captions');
+        this.captionsAvailable = false;
       }
     };
     
     checkCaptions();
+  }
+
+  // Method for popup to check caption availability
+  getCaptionStatus() {
+    const captionData = window.captionFetcher?.getCurrentCaptions();
+    const searchEngine = window.searchEngine;
+    const hasSearchIndex = searchEngine && searchEngine.isReady && searchEngine.isReady();
+    
+    if (captionData || hasSearchIndex) {
+      this.captionsAvailable = true;
+      
+      // Calculate segment count more reliably
+      let segmentCount = 0;
+      if (captionData) {
+        // Handle both array and object with segments property
+        if (Array.isArray(captionData)) {
+          segmentCount = captionData.length;
+        } else if (captionData.segments && Array.isArray(captionData.segments)) {
+          segmentCount = captionData.segments.length;
+        }
+      } else if (searchEngine && searchEngine.getSegmentCount) {
+        segmentCount = searchEngine.getSegmentCount();
+      }
+      
+      return {
+        available: true,
+        source: captionData ? 'caption-fetcher' : 'search-engine',
+        segmentCount: segmentCount || 0
+      };
+    } else {
+      this.captionsAvailable = false;
+      return {
+        available: false,
+        source: null,
+        segmentCount: 0
+      };
+    }
+  }
+
+  // Method to get caption data for popup display
+  getCaptionData() {
+    return window.captionFetcher?.getCurrentCaptions() || null;
   }
 
   createSearchOverlay() {
@@ -391,22 +446,101 @@ class UIController {
 
   jumpToTimestamp(seconds) {
     try {
-      // Find YouTube player
-      const player = document.getElementById('movie_player') || 
-                    document.querySelector('.html5-video-player');
+      console.log('SeekSpeak: Attempting to jump to', this.formatTimestamp(seconds), `(${seconds}s)`);
       
-      if (player && player.seekTo) {
-        player.seekTo(seconds, true);
-        console.log('SeekSpeak: Jumped to', this.formatTimestamp(seconds));
+      // Multiple approaches to find and control the YouTube player
+      let success = false;
+      
+      // Method 1: Try movie_player (most common)
+      const moviePlayer = document.getElementById('movie_player');
+      if (moviePlayer && moviePlayer.seekTo) {
+        console.log('SeekSpeak: Using movie_player.seekTo()');
+        moviePlayer.seekTo(seconds, true);
+        success = true;
+      }
+      
+      // Method 2: Try html5-video-player
+      if (!success) {
+        const html5Player = document.querySelector('.html5-video-player');
+        if (html5Player && html5Player.seekTo) {
+          console.log('SeekSpeak: Using html5-video-player.seekTo()');
+          html5Player.seekTo(seconds, true);
+          success = true;
+        }
+      }
+      
+      // Method 3: Try direct video element
+      if (!success) {
+        const videoElement = document.querySelector('video');
+        if (videoElement) {
+          console.log('SeekSpeak: Using video.currentTime');
+          videoElement.currentTime = seconds;
+          success = true;
+        }
+      }
+      
+      // Method 4: Try YouTube's internal player API
+      if (!success && window.ytInitialPlayerResponse) {
+        console.log('SeekSpeak: Trying YouTube internal player API');
+        try {
+          // Look for the player in global scope
+          if (window.player && window.player.seekTo) {
+            window.player.seekTo(seconds, true);
+            success = true;
+          }
+        } catch (apiError) {
+          console.log('SeekSpeak: YouTube API method failed:', apiError.message);
+        }
+      }
+      
+      // Method 5: Try to simulate user interaction with progress bar
+      if (!success) {
+        console.log('SeekSpeak: Trying progress bar simulation');
+        try {
+          const progressBar = document.querySelector('.ytp-progress-bar') || 
+                            document.querySelector('.html5-progress-bar');
+          const videoElement = document.querySelector('video');
+          
+          if (progressBar && videoElement && videoElement.duration) {
+            const duration = videoElement.duration;
+            const progressPercent = (seconds / duration) * 100;
+            
+            // Calculate click position on progress bar
+            const rect = progressBar.getBoundingClientRect();
+            const clickX = rect.left + (rect.width * progressPercent / 100);
+            
+            // Simulate click on progress bar
+            const clickEvent = new MouseEvent('click', {
+              bubbles: true,
+              cancelable: true,
+              clientX: clickX,
+              clientY: rect.top + rect.height / 2
+            });
+            
+            progressBar.dispatchEvent(clickEvent);
+            success = true;
+            console.log('SeekSpeak: Simulated progress bar click');
+          }
+        } catch (simError) {
+          console.log('SeekSpeak: Progress bar simulation failed:', simError.message);
+        }
+      }
+      
+      if (success) {
+        console.log('SeekSpeak: Successfully jumped to', this.formatTimestamp(seconds));
         
-        // Optional: Hide overlay after jumping
+        // Optional: Hide overlay after jumping (can be made user configurable)
         // this.hideSearchOverlay();
         
       } else {
-        console.warn('SeekSpeak: YouTube player not found');
+        console.warn('SeekSpeak: All video seeking methods failed - YouTube player not accessible');
+        // Show user feedback
+        this.updateStatus(`Unable to jump to ${this.formatTimestamp(seconds)} - player not accessible`);
       }
+      
     } catch (error) {
       console.error('SeekSpeak: Error jumping to timestamp:', error);
+      this.updateStatus(`Error jumping to timestamp: ${error.message}`);
     }
   }
 

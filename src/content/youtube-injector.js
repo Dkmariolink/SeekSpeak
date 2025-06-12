@@ -95,6 +95,33 @@ class YouTubeInjector {
     return null;
   }
 
+  extractVideoTitle() {
+    // Try multiple selectors to get the video title
+    const titleSelectors = [
+      'h1.ytd-watch-metadata yt-formatted-string',
+      'h1.title.style-scope.ytd-video-primary-info-renderer',
+      'h1.style-scope.ytd-watch-metadata',
+      '.ytd-watch-metadata h1',
+      '#container h1'
+    ];
+    
+    for (const selector of titleSelectors) {
+      const titleElement = document.querySelector(selector);
+      if (titleElement && titleElement.textContent.trim()) {
+        return titleElement.textContent.trim();
+      }
+    }
+    
+    // Fallback to page title
+    const pageTitle = document.title;
+    if (pageTitle && pageTitle !== 'YouTube') {
+      // Remove " - YouTube" suffix if present
+      return pageTitle.replace(/ - YouTube$/, '').trim();
+    }
+    
+    return 'YouTube Video';
+  }
+
   async setupExtension() {
     try {
       // Update badge to show loading
@@ -111,7 +138,7 @@ class YouTubeInjector {
         console.log('SeekSpeak: Initializing caption fetcher');
         const captionData = await window.captionFetcher.init(this.currentVideoId);
         
-        if (captionData) {
+        if (captionData && captionData.segments && captionData.segments.length > 0) {
           console.log('SeekSpeak: Caption data received, initializing search engine');
           // Initialize search engine with caption data
           if (window.searchEngine) {
@@ -124,7 +151,25 @@ class YouTubeInjector {
                 type: 'UPDATE_BADGE',
                 status: 'found'
               });
+              
+              // Initialize UI controller
+              if (window.uiController) {
+                console.log('SeekSpeak: Initializing UI controller');
+                await window.uiController.init();
+                
+                console.log('SeekSpeak: Extension setup complete for video', this.currentVideoId);
+                return true; // Success
+              } else {
+                console.error('SeekSpeak: UI controller not available');
+                return false;
+              }
+            } else {
+              console.warn('SeekSpeak: Failed to build search index');
+              return false;
             }
+          } else {
+            console.error('SeekSpeak: Search engine not available');
+            return false;
           }
         } else {
           console.warn('SeekSpeak: No caption data available');
@@ -132,20 +177,12 @@ class YouTubeInjector {
             type: 'UPDATE_BADGE',
             status: 'warning'
           });
+          return false;
         }
       } else {
         console.error('SeekSpeak: Caption fetcher not available');
+        return false;
       }
-      
-      // Initialize UI controller
-      if (window.uiController) {
-        console.log('SeekSpeak: Initializing UI controller');
-        await window.uiController.init();
-      } else {
-        console.error('SeekSpeak: UI controller not available');
-      }
-      
-      console.log('SeekSpeak: Extension setup complete for video', this.currentVideoId);
       
     } catch (error) {
       console.error('SeekSpeak setup error:', error);
@@ -154,6 +191,8 @@ class YouTubeInjector {
         type: 'UPDATE_BADGE',
         status: 'error'
       });
+      
+      return false;
     }
   }
 
@@ -177,30 +216,60 @@ class YouTubeInjector {
   observePageChanges() {
     // Monitor URL changes for YouTube's SPA navigation
     let lastUrl = window.location.href;
+    let changeTimeout = null;
     
-    const observer = new MutationObserver(() => {
+    const handleUrlChange = () => {
       const currentUrl = window.location.href;
       
       if (currentUrl !== lastUrl) {
+        console.log('SeekSpeak: URL changed from', lastUrl, 'to', currentUrl);
         lastUrl = currentUrl;
-        this.handlePageChange();
+        
+        // Debounce rapid navigation changes
+        if (changeTimeout) {
+          clearTimeout(changeTimeout);
+        }
+        
+        changeTimeout = setTimeout(() => {
+          this.handlePageChange();
+        }, 500); // Wait 500ms for YouTube to settle
       }
-    });
+    };
     
-    // Observe changes to the document
+    // Method 1: MutationObserver for DOM changes
+    const observer = new MutationObserver(handleUrlChange);
     observer.observe(document, {
       subtree: true,
       childList: true
     });
     
-    // Also listen for popstate events
+    // Method 2: Listen for popstate events (back/forward navigation)
     window.addEventListener('popstate', () => {
-      setTimeout(() => this.handlePageChange(), 100);
+      setTimeout(handleUrlChange, 100);
     });
+    
+    // Method 3: Listen for YouTube's navigation events
+    document.addEventListener('yt-navigate-start', () => {
+      console.log('SeekSpeak: YouTube navigation started');
+    });
+    
+    document.addEventListener('yt-navigate-finish', () => {
+      console.log('SeekSpeak: YouTube navigation finished');
+      setTimeout(handleUrlChange, 200);
+    });
+    
+    // Method 4: Poll for URL changes as fallback (less efficient but reliable)
+    setInterval(() => {
+      handleUrlChange();
+    }, 2000); // Check every 2 seconds as fallback
+    
+    console.log('SeekSpeak: Page change monitoring initialized');
   }
 
   async handlePageChange() {
     const newVideoId = this.extractVideoId();
+    
+    console.log('SeekSpeak: Handling page change - Current:', this.currentVideoId, 'New:', newVideoId);
     
     if (newVideoId && newVideoId !== this.currentVideoId) {
       console.log('SeekSpeak: Video changed from', this.currentVideoId, 'to', newVideoId);
@@ -208,14 +277,49 @@ class YouTubeInjector {
       // Clean up previous video state
       this.cleanup();
       
-      // Set up for new video
+      // Set up for new video with retry mechanism
       this.currentVideoId = newVideoId;
-      await this.setupExtension();
       
+      // Wait a bit for YouTube to stabilize, then try setup
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      let attempts = 0;
+      const maxAttempts = 3;
+      
+      while (attempts < maxAttempts) {
+        try {
+          console.log(`SeekSpeak: Setup attempt ${attempts + 1} for video ${newVideoId}`);
+          
+          // Try to set up the extension
+          const success = await this.setupExtension();
+          
+          if (success) {
+            console.log('SeekSpeak: Setup successful for video', newVideoId);
+            break;
+          } else {
+            attempts++;
+            if (attempts < maxAttempts) {
+              console.log(`SeekSpeak: Setup failed, retrying in 2 seconds (attempt ${attempts + 1}/${maxAttempts})`);
+              await new Promise(resolve => setTimeout(resolve, 2000));
+            } else {
+              console.warn('SeekSpeak: Setup failed after', maxAttempts, 'attempts');
+            }
+          }
+        } catch (error) {
+          console.error(`SeekSpeak: Setup error on attempt ${attempts + 1}:`, error);
+          attempts++;
+          if (attempts < maxAttempts) {
+            await new Promise(resolve => setTimeout(resolve, 2000));
+          }
+        }
+      }
     } else if (!newVideoId) {
+      console.log('SeekSpeak: No video ID found, might not be a video page');
       // Navigated away from video page
       this.cleanup();
       this.currentVideoId = null;
+    } else {
+      console.log('SeekSpeak: Same video ID, no action needed');
     }
   }
 
@@ -229,7 +333,8 @@ class YouTubeInjector {
         case 'GET_CURRENT_VIDEO':
           sendResponse({
             videoId: this.currentVideoId,
-            url: window.location.href
+            url: window.location.href,
+            videoTitle: this.extractVideoTitle()
           });
           break;
           

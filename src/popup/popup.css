@@ -22,10 +22,22 @@ body {
 
 /* Header */
 .popup-header {
-  background: linear-gradient(135deg, #ff0000 0%, #cc0000 100%);
+  background: #282828;
   color: white;
   padding: 16px 20px;
   text-align: center;
+}
+
+.popup-logo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.popup-icon {
+  width: 24px;
+  height: 24px;
 }
 
 .popup-logo h1 {
@@ -100,12 +112,15 @@ body {
 .action-button.primary.enabled {
   background: #ff0000;
   color: white;
+  font-weight: 600;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
 }
 
 .action-button.primary.enabled:hover {
   background: #cc0000;
   transform: translateY(-1px);
   box-shadow: 0 2px 8px rgba(255, 0, 0, 0.3);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
 }
 
 .button-icon {

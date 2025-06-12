@@ -9,18 +9,20 @@ class BackgroundService {
   }
 
   setupEventListeners() {
-    // Extension installation and startup
-    chrome.runtime.onInstalled.addListener(this.onInstalled.bind(this));
-    chrome.runtime.onStartup.addListener(this.onStartup.bind(this));
+    // Extension installation and startup - handled globally below
+    // chrome.runtime.onInstalled.addListener(this.onInstalled.bind(this));
+    // chrome.runtime.onStartup.addListener(this.onStartup.bind(this));
     
-    // Message handling between content scripts and popup
-    chrome.runtime.onMessage.addListener(this.handleMessage.bind(this));
+    // Message handling - handled globally below 
+    // chrome.runtime.onMessage.addListener(this.handleMessage.bind(this));
     
     // Command handling (keyboard shortcuts)
     chrome.commands.onCommand.addListener(this.handleCommand.bind(this));
     
     // Tab updates for YouTube navigation
     chrome.tabs.onUpdated.addListener(this.onTabUpdated.bind(this));
+    
+    console.log('SeekSpeak Background: BackgroundService event listeners setup complete');
   }
 
   onInstalled(details) {
@@ -40,6 +42,8 @@ class BackgroundService {
   }
 
   async handleMessage(message, sender, sendResponse) {
+    console.log('SeekSpeak Background: Received message:', message.type);
+    
     try {
       switch (message.type) {
         case 'GET_VIDEO_INFO':
@@ -47,21 +51,28 @@ class BackgroundService {
           
         case 'UPDATE_BADGE':
           await this.updateBadge(sender.tab.id, message.status);
-          break;
+          return { success: true };
           
         case 'STORE_CAPTIONS':
           await this.storeCaptions(message.videoId, message.captions);
-          break;
+          return { success: true };
           
         case 'GET_CAPTIONS':
           return await this.getCaptions(message.videoId);
+
+        case 'FETCH_CAPTION_URL':
+          console.log('SeekSpeak Background: Handling FETCH_CAPTION_URL request');
+          const result = await this.fetchCaptionUrl(message.url, message.videoId);
+          console.log('SeekSpeak Background: Returning result:', result);
+          return result;
           
         default:
-          console.warn('Unknown message type:', message.type);
+          console.warn('SeekSpeak Background: Unknown message type:', message.type);
+          return { success: false, error: 'Unknown message type' };
       }
     } catch (error) {
-      console.error('Error handling message:', error);
-      return { error: error.message };
+      console.error('SeekSpeak Background: Error handling message:', error);
+      return { success: false, error: error.message };
     }
   }
 
@@ -162,6 +173,80 @@ class BackgroundService {
     return null;
   }
 
+  async fetchCaptionUrl(url, videoId) {
+    console.log('SeekSpeak Background: Fetching caption URL:', url);
+    
+    try {
+      // Background script can make requests with full browser permissions
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Accept': '*/*',
+          'Accept-Language': 'en-US,en;q=0.9',
+          'User-Agent': navigator.userAgent,
+          'Referer': `https://www.youtube.com/watch?v=${videoId}`,
+          'Origin': 'https://www.youtube.com'
+        },
+        credentials: 'include',
+        mode: 'cors'
+      });
+
+      console.log('SeekSpeak Background: Response status:', response.status);
+      console.log('SeekSpeak Background: Response headers:', Object.fromEntries(response.headers.entries()));
+
+      if (!response.ok) {
+        console.log('SeekSpeak Background: Response not OK:', response.status, response.statusText);
+        return { 
+          success: false, 
+          error: `HTTP ${response.status}: ${response.statusText}`,
+          status: response.status 
+        };
+      }
+
+      const contentType = response.headers.get('content-type') || '';
+      console.log('SeekSpeak Background: Content-Type:', contentType);
+
+      // Try to get the response text
+      const text = await response.text();
+      console.log('SeekSpeak Background: Response length:', text.length);
+      console.log('SeekSpeak Background: First 200 chars:', text.substring(0, 200));
+
+      if (text.length === 0) {
+        console.log('SeekSpeak Background: Empty response received');
+        return { 
+          success: false, 
+          error: 'Empty response from YouTube',
+          contentType 
+        };
+      }
+
+      // Check if we got an HTML error page instead of captions
+      if (contentType.includes('text/html') && text.includes('<html')) {
+        console.log('SeekSpeak Background: Received HTML page instead of captions');
+        return { 
+          success: false, 
+          error: 'YouTube returned HTML page instead of captions (possibly authentication issue)',
+          contentType 
+        };
+      }
+
+      return {
+        success: true,
+        data: text,
+        contentType,
+        length: text.length
+      };
+
+    } catch (error) {
+      console.error('SeekSpeak Background: Fetch error:', error);
+      return {
+        success: false,
+        error: error.message,
+        type: error.name
+      };
+    }
+  }
+
   showWelcomeMessage() {
     // Create welcome notification or open options page
     console.log('Welcome to SeekSpeak! Use Ctrl+Shift+F to search video captions.');
@@ -169,4 +254,42 @@ class BackgroundService {
 }
 
 // Initialize the background service
-new BackgroundService();
+const backgroundService = new BackgroundService();
+
+// Add global logging to debug message handling
+console.log('SeekSpeak Background: Service worker starting up');
+
+// Debug: Log when service worker is ready
+chrome.runtime.onStartup.addListener(() => {
+  console.log('SeekSpeak Background: Runtime startup event fired');
+});
+
+chrome.runtime.onInstalled.addListener(() => {
+  console.log('SeekSpeak Background: Extension installed/updated');
+});
+
+// Debug: Add additional message listener to catch any missed messages
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  console.log('SeekSpeak Background: Message received (global listener):', message);
+  console.log('SeekSpeak Background: Sender tab:', sender.tab?.id);
+  
+  // Call the class method and return the promise
+  const result = backgroundService.handleMessage(message, sender, sendResponse);
+  
+  // If it's a promise, handle it properly
+  if (result instanceof Promise) {
+    result.then(response => {
+      console.log('SeekSpeak Background: Sending response:', response);
+      sendResponse(response);
+    }).catch(error => {
+      console.error('SeekSpeak Background: Promise error:', error);
+      sendResponse({ success: false, error: error.message });
+    });
+    return true; // Keep the message channel open for async response
+  } else {
+    console.log('SeekSpeak Background: Sending sync response:', result);
+    sendResponse(result);
+  }
+});
+
+console.log('SeekSpeak Background: All listeners registered');
