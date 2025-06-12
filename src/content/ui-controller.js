@@ -30,31 +30,30 @@ class UIController {
   }
 
   async waitForCaptions() {
-    const maxWait = 10000; // 10 seconds
+    console.log('SeekSpeak: UI Controller checking for caption data');
+    
+    // Check if captions are already available
+    const captionData = window.captionFetcher?.getCurrentCaptions();
+    
+    if (captionData) {
+      console.log('SeekSpeak: Caption data already available');
+      return;
+    }
+    
+    // Wait a bit more for captions to be fetched
+    const maxWait = 5000; // 5 seconds
     const startTime = Date.now();
     
     const checkCaptions = () => {
       const captionData = window.captionFetcher?.getCurrentCaptions();
       
       if (captionData) {
-        // Build search index
-        window.searchEngine.buildIndex(captionData);
-        console.log('SeekSpeak: Ready for search');
-        
-        // Update status
-        chrome.runtime.sendMessage({
-          type: 'UPDATE_BADGE',
-          status: 'found'
-        });
-        
+        console.log('SeekSpeak: Caption data now available');
+        return;
       } else if (Date.now() - startTime < maxWait) {
         setTimeout(checkCaptions, 500);
       } else {
-        console.warn('SeekSpeak: Timed out waiting for captions');
-        chrome.runtime.sendMessage({
-          type: 'UPDATE_BADGE',
-          status: 'error'
-        });
+        console.warn('SeekSpeak: UI Controller timed out waiting for captions');
       }
     };
     

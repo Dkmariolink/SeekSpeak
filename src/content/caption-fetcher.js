@@ -12,6 +12,7 @@ class CaptionFetcher {
 
   async init(videoId) {
     this.currentVideoId = videoId;
+    console.log('SeekSpeak: CaptionFetcher initializing for video:', videoId);
     
     try {
       // Check for cached captions first
@@ -67,20 +68,30 @@ class CaptionFetcher {
 
   async fetchFromTimedTextAPI(videoId) {
     // YouTube's internal timedtext API (primary method)
-    const languages = ['en', 'en-US', 'en-GB']; // Try English first
+    const languages = ['en', 'en-US', 'en-GB', 'a.en']; // Try English first, including auto-generated
+    
+    console.log('SeekSpeak: Trying timedtext API for languages:', languages);
     
     for (const lang of languages) {
       try {
         const url = `https://www.youtube.com/api/timedtext?v=${videoId}&lang=${lang}&fmt=json3`;
+        console.log('SeekSpeak: Fetching captions from:', url);
+        
         const response = await fetch(url);
+        console.log('SeekSpeak: Response status:', response.status, 'for language:', lang);
         
         if (response.ok) {
           const data = await response.json();
+          console.log('SeekSpeak: Caption data received:', data);
           
           if (data.events && data.events.length > 0) {
-            console.log('SeekSpeak: Captions fetched via timedtext API for language:', lang);
+            console.log('SeekSpeak: Captions fetched via timedtext API for language:', lang, 'Events:', data.events.length);
             return this.parseTimedTextFormat(data.events);
+          } else {
+            console.log('SeekSpeak: No events in caption data for language:', lang);
           }
+        } else {
+          console.log('SeekSpeak: Failed to fetch captions for language:', lang, 'Status:', response.status);
         }
       } catch (error) {
         console.warn(`SeekSpeak: Timedtext API failed for ${lang}:`, error.message);
@@ -120,13 +131,26 @@ class CaptionFetcher {
 
   async fetchFromPlayerData(videoId) {
     // Try to extract caption data from YouTube's player configuration
+    console.log('SeekSpeak: Trying to extract captions from player data');
+    
     try {
       // Look for player data in various possible locations
       const playerData = this.extractPlayerData();
+      console.log('SeekSpeak: Player data found:', !!playerData);
       
       if (playerData && playerData.captions) {
         console.log('SeekSpeak: Captions found in player data');
         return this.parsePlayerCaptions(playerData.captions);
+      } else if (playerData) {
+        console.log('SeekSpeak: Player data exists but no captions property');
+        // Try to find captions in different locations
+        if (playerData.playerResponse) {
+          console.log('SeekSpeak: Checking playerResponse for captions');
+          const captions = this.extractCaptionsFromPlayerResponse(playerData.playerResponse);
+          if (captions) {
+            return captions;
+          }
+        }
       }
     } catch (error) {
       console.warn('SeekSpeak: Failed to extract from player data:', error.message);
@@ -137,7 +161,17 @@ class CaptionFetcher {
 
   extractPlayerData() {
     // Try to find YouTube's player configuration data
+    console.log('SeekSpeak: Searching for player configuration data');
+    
+    // Method 1: Look in window variables
+    if (window.ytInitialPlayerResponse) {
+      console.log('SeekSpeak: Found ytInitialPlayerResponse');
+      return window.ytInitialPlayerResponse;
+    }
+    
+    // Method 2: Search in script tags
     const scripts = document.querySelectorAll('script');
+    console.log('SeekSpeak: Searching through', scripts.length, 'script tags');
     
     for (const script of scripts) {
       const content = script.textContent;
@@ -145,12 +179,81 @@ class CaptionFetcher {
       // Look for player configuration patterns
       const playerConfigMatch = content.match(/ytInitialPlayerResponse\s*=\s*({.+?});/);
       if (playerConfigMatch) {
+        console.log('SeekSpeak: Found player config in script tag');
         try {
           return JSON.parse(playerConfigMatch[1]);
         } catch (e) {
+          console.warn('SeekSpeak: Failed to parse player config:', e);
           continue;
         }
       }
+      
+      // Also try var ytInitialPlayerResponse pattern
+      const varMatch = content.match(/var\s+ytInitialPlayerResponse\s*=\s*({.+?});/);
+      if (varMatch) {
+        console.log('SeekSpeak: Found var ytInitialPlayerResponse in script tag');
+        try {
+          return JSON.parse(varMatch[1]);
+        } catch (e) {
+          console.warn('SeekSpeak: Failed to parse var player config:', e);
+          continue;
+        }
+      }
+    }
+    
+    console.log('SeekSpeak: No player configuration data found');
+    return null;
+  }
+
+  extractCaptionsFromPlayerResponse(playerResponse) {
+    console.log('SeekSpeak: Extracting captions from playerResponse');
+    
+    try {
+      const captions = playerResponse?.captions?.playerCaptionsTracklistRenderer?.captionTracks;
+      
+      if (captions && captions.length > 0) {
+        console.log('SeekSpeak: Found', captions.length, 'caption tracks');
+        
+        // Find English caption track
+        const englishTrack = captions.find(track => 
+          track.languageCode === 'en' || 
+          track.languageCode === 'en-US' ||
+          track.languageCode.startsWith('en')
+        );
+        
+        if (englishTrack) {
+          console.log('SeekSpeak: Found English caption track:', englishTrack);
+          return this.fetchCaptionFromUrl(englishTrack.baseUrl);
+        } else {
+          console.log('SeekSpeak: No English caption track found, using first available');
+          return this.fetchCaptionFromUrl(captions[0].baseUrl);
+        }
+      }
+    } catch (error) {
+      console.error('SeekSpeak: Error extracting captions from playerResponse:', error);
+    }
+    
+    return null;
+  }
+
+  async fetchCaptionFromUrl(baseUrl) {
+    console.log('SeekSpeak: Fetching caption from URL:', baseUrl);
+    
+    try {
+      // Add format parameter to get JSON format
+      const url = baseUrl + '&fmt=json3';
+      const response = await fetch(url);
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log('SeekSpeak: Successfully fetched caption data from URL');
+        
+        if (data.events && data.events.length > 0) {
+          return this.parseTimedTextFormat(data.events);
+        }
+      }
+    } catch (error) {
+      console.error('SeekSpeak: Error fetching caption from URL:', error);
     }
     
     return null;
@@ -158,11 +261,15 @@ class CaptionFetcher {
 
   parseFromTranscriptPanel() {
     // Fallback: try to parse from YouTube's transcript panel if it's open
+    console.log('SeekSpeak: Trying to parse from transcript panel');
+    
     const transcriptContainer = document.querySelector('[data-target-id="engagement-panel-searchable-transcript"]');
     
     if (transcriptContainer) {
+      console.log('SeekSpeak: Found transcript container');
       const segments = [];
       const transcriptItems = transcriptContainer.querySelectorAll('[data-start-time]');
+      console.log('SeekSpeak: Found', transcriptItems.length, 'transcript items');
       
       for (const item of transcriptItems) {
         const startTime = parseInt(item.dataset.startTime);
@@ -181,6 +288,24 @@ class CaptionFetcher {
       if (segments.length > 0) {
         console.log('SeekSpeak: Captions parsed from transcript panel');
         return segments;
+      }
+    } else {
+      console.log('SeekSpeak: No transcript container found');
+      
+      // Try alternative selectors
+      const altSelectors = [
+        '.ytd-transcript-segment-renderer',
+        '.transcript-text',
+        '[role="button"][data-start-time]'
+      ];
+      
+      for (const selector of altSelectors) {
+        const items = document.querySelectorAll(selector);
+        if (items.length > 0) {
+          console.log('SeekSpeak: Found', items.length, 'items with selector:', selector);
+          // Try to extract transcript data from these elements
+          break;
+        }
       }
     }
     

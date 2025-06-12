@@ -84,24 +84,42 @@ class YouTubeInjector {
       
       // Initialize caption fetcher
       if (window.captionFetcher) {
-        await window.captionFetcher.init(this.currentVideoId);
-      }
-      
-      // Initialize search engine
-      if (window.searchEngine) {
-        window.searchEngine.init();
+        console.log('SeekSpeak: Initializing caption fetcher');
+        const captionData = await window.captionFetcher.init(this.currentVideoId);
+        
+        if (captionData) {
+          console.log('SeekSpeak: Caption data received, initializing search engine');
+          // Initialize search engine with caption data
+          if (window.searchEngine) {
+            const indexBuilt = await window.searchEngine.buildIndex(captionData);
+            if (indexBuilt) {
+              console.log('SeekSpeak: Search index built successfully');
+              
+              // Update badge to show ready
+              chrome.runtime.sendMessage({
+                type: 'UPDATE_BADGE',
+                status: 'found'
+              });
+            }
+          }
+        } else {
+          console.warn('SeekSpeak: No caption data available');
+          chrome.runtime.sendMessage({
+            type: 'UPDATE_BADGE',
+            status: 'warning'
+          });
+        }
+      } else {
+        console.error('SeekSpeak: Caption fetcher not available');
       }
       
       // Initialize UI controller
       if (window.uiController) {
+        console.log('SeekSpeak: Initializing UI controller');
         await window.uiController.init();
+      } else {
+        console.error('SeekSpeak: UI controller not available');
       }
-      
-      // Update badge to show ready
-      chrome.runtime.sendMessage({
-        type: 'UPDATE_BADGE',
-        status: 'ready'
-      });
       
       console.log('SeekSpeak: Extension setup complete for video', this.currentVideoId);
       
