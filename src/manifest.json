@@ -20,10 +20,10 @@
         "https://m.youtube.com/watch*"
       ],
       "js": [
-        "content/youtube-injector.js",
-        "content/caption-fetcher.js", 
-        "content/search-engine.js",
-        "content/ui-controller.js"
+        "content/caption-fetcher.js",
+        "content/search-engine.js", 
+        "content/ui-controller.js",
+        "content/youtube-injector.js"
       ],
       "css": [
         "content/seekspeak.css"

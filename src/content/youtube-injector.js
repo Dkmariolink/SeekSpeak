@@ -15,6 +15,9 @@ class YouTubeInjector {
   async init() {
     console.log('SeekSpeak: YouTube Injector initializing...');
     
+    // Wait for all components to be loaded
+    await this.waitForComponents();
+    
     // Check if we're on a YouTube video page
     this.isYouTubePage = this.detectVideoPage();
     console.log('SeekSpeak: Is YouTube page?', this.isYouTubePage);
@@ -41,6 +44,27 @@ class YouTubeInjector {
     } else {
       console.log('SeekSpeak: Not a YouTube video page');
     }
+  }
+
+  async waitForComponents() {
+    console.log('SeekSpeak: Waiting for components to load...');
+    
+    const maxWait = 5000; // 5 seconds
+    const startTime = Date.now();
+    
+    while (Date.now() - startTime < maxWait) {
+      if (window.captionFetcher && window.searchEngine && window.uiController) {
+        console.log('SeekSpeak: All components loaded successfully');
+        return;
+      }
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    
+    console.warn('SeekSpeak: Some components may not have loaded:', {
+      captionFetcher: !!window.captionFetcher,
+      searchEngine: !!window.searchEngine,
+      uiController: !!window.uiController
+    });
   }
 
   detectVideoPage() {
