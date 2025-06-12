@@ -68,36 +68,83 @@ class CaptionFetcher {
 
   async fetchFromTimedTextAPI(videoId) {
     // YouTube's internal timedtext API (primary method)
-    const languages = ['en', 'en-US', 'en-GB', 'a.en']; // Try English first, including auto-generated
+    const attempts = [
+      // Try different combinations of language and format
+      { lang: 'en', fmt: 'srv3' },     // XML format
+      { lang: 'a.en', fmt: 'srv3' },   // Auto-generated XML
+      { lang: 'en', fmt: 'vtt' },      // WebVTT format
+      { lang: 'a.en', fmt: 'vtt' },    // Auto-generated WebVTT
+      { lang: 'en', fmt: 'json3' },    // JSON format (if it works)
+      { lang: 'a.en', fmt: 'json3' },  // Auto-generated JSON
+      { lang: 'en' },                  // Default format
+      { lang: 'a.en' }                 // Auto-generated default
+    ];
     
-    console.log('SeekSpeak: Trying timedtext API for languages:', languages);
+    console.log('SeekSpeak: Trying timedtext API with multiple formats');
     
-    for (const lang of languages) {
+    for (const attempt of attempts) {
       try {
-        const url = `https://www.youtube.com/api/timedtext?v=${videoId}&lang=${lang}&fmt=json3`;
+        let url = `https://www.youtube.com/api/timedtext?v=${videoId}&lang=${attempt.lang}`;
+        if (attempt.fmt) {
+          url += `&fmt=${attempt.fmt}`;
+        }
+        
         console.log('SeekSpeak: Fetching captions from:', url);
         
         const response = await fetch(url);
-        console.log('SeekSpeak: Response status:', response.status, 'for language:', lang);
+        console.log('SeekSpeak: Response status:', response.status, 'for', attempt.lang, attempt.fmt || 'default');
         
         if (response.ok) {
-          const data = await response.json();
-          console.log('SeekSpeak: Caption data received:', data);
+          const responseText = await response.text();
+          console.log('SeekSpeak: Response length:', responseText.length, 'format:', attempt.fmt || 'default');
           
-          if (data.events && data.events.length > 0) {
-            console.log('SeekSpeak: Captions fetched via timedtext API for language:', lang, 'Events:', data.events.length);
-            return this.parseTimedTextFormat(data.events);
+          if (responseText.trim().length === 0) {
+            console.log('SeekSpeak: Empty response, trying next format');
+            continue;
+          }
+          
+          let parsedData = null;
+          
+          if (attempt.fmt === 'vtt' || responseText.includes('WEBVTT')) {
+            console.log('SeekSpeak: Parsing as VTT format');
+            parsedData = this.parseVTTFormat(responseText);
+          } else if (attempt.fmt === 'srv3' || responseText.includes('<transcript>') || responseText.includes('<text ')) {
+            console.log('SeekSpeak: Parsing as XML format');
+            const xmlData = this.parseXMLResponse(responseText);
+            if (xmlData && xmlData.events) {
+              parsedData = this.parseTimedTextFormat(xmlData.events);
+            }
           } else {
-            console.log('SeekSpeak: No events in caption data for language:', lang);
+            console.log('SeekSpeak: Trying JSON format');
+            try {
+              const jsonData = JSON.parse(responseText);
+              if (jsonData.events && jsonData.events.length > 0) {
+                parsedData = this.parseTimedTextFormat(jsonData.events);
+              }
+            } catch (jsonError) {
+              console.log('SeekSpeak: JSON parse failed, trying XML');
+              const xmlData = this.parseXMLResponse(responseText);
+              if (xmlData && xmlData.events) {
+                parsedData = this.parseTimedTextFormat(xmlData.events);
+              }
+            }
+          }
+          
+          if (parsedData && parsedData.length > 0) {
+            console.log('SeekSpeak: Successfully parsed', parsedData.length, 'caption segments with format:', attempt.fmt || 'default');
+            return parsedData;
+          } else {
+            console.log('SeekSpeak: No usable data from format:', attempt.fmt || 'default');
           }
         } else {
-          console.log('SeekSpeak: Failed to fetch captions for language:', lang, 'Status:', response.status);
+          console.log('SeekSpeak: Failed to fetch for format:', attempt.fmt || 'default', 'Status:', response.status);
         }
       } catch (error) {
-        console.warn(`SeekSpeak: Timedtext API failed for ${lang}:`, error.message);
+        console.warn(`SeekSpeak: Timedtext API failed for ${attempt.lang} ${attempt.fmt || 'default'}:`, error.message);
       }
     }
 
+    console.log('SeekSpeak: All timedtext API attempts failed');
     return null;
   }
 
@@ -236,27 +283,87 @@ class CaptionFetcher {
     return null;
   }
 
-  async fetchCaptionFromUrl(baseUrl) {
-    console.log('SeekSpeak: Fetching caption from URL:', baseUrl);
+  parseXMLResponse(xmlText) {
+    console.log('SeekSpeak: Parsing XML response');
     
     try {
-      // Add format parameter to get JSON format
-      const url = baseUrl + '&fmt=json3';
-      const response = await fetch(url);
+      const parser = new DOMParser();
+      const xmlDoc = parser.parseFromString(xmlText, 'text/xml');
       
-      if (response.ok) {
-        const data = await response.json();
-        console.log('SeekSpeak: Successfully fetched caption data from URL');
+      // Check for XML parsing errors
+      const parseError = xmlDoc.querySelector('parsererror');
+      if (parseError) {
+        console.error('SeekSpeak: XML parsing error:', parseError.textContent);
+        return null;
+      }
+      
+      const textElements = xmlDoc.querySelectorAll('text');
+      console.log('SeekSpeak: Found', textElements.length, 'text elements in XML');
+      
+      if (textElements.length === 0) {
+        return null;
+      }
+      
+      // Convert XML format to our expected JSON-like format
+      const events = [];
+      
+      for (const textEl of textElements) {
+        const start = parseFloat(textEl.getAttribute('start')) || 0;
+        const dur = parseFloat(textEl.getAttribute('dur')) || 3;
+        const text = textEl.textContent || '';
         
-        if (data.events && data.events.length > 0) {
-          return this.parseTimedTextFormat(data.events);
+        if (text.trim()) {
+          events.push({
+            tStartMs: Math.floor(start * 1000),
+            dDurationMs: Math.floor(dur * 1000),
+            segs: [{ utf8: text.trim() }]
+          });
         }
       }
+      
+      console.log('SeekSpeak: Converted', events.length, 'XML elements to events');
+      return { events };
+      
     } catch (error) {
-      console.error('SeekSpeak: Error fetching caption from URL:', error);
+      console.error('SeekSpeak: Error parsing XML:', error);
+      return null;
     }
+  }
+
+  parsePlayerCaptions(captions) {
+    console.log('SeekSpeak: Parsing player captions data');
     
-    return null;
+    try {
+      // Handle different possible caption data structures
+      if (captions.playerCaptionsTracklistRenderer) {
+        return this.extractCaptionsFromPlayerResponse({ captions });
+      }
+      
+      // If it's already processed caption data
+      if (Array.isArray(captions)) {
+        console.log('SeekSpeak: Player captions already in array format');
+        return captions;
+      }
+      
+      // Try to extract from other possible structures
+      if (captions.tracks) {
+        console.log('SeekSpeak: Found tracks in player captions');
+        const englishTrack = captions.tracks.find(track => 
+          track.languageCode === 'en' || track.languageCode?.startsWith('en')
+        );
+        
+        if (englishTrack && englishTrack.baseUrl) {
+          return this.fetchCaptionFromUrl(englishTrack.baseUrl);
+        }
+      }
+      
+      console.log('SeekSpeak: Unknown player caption format:', captions);
+      return null;
+      
+    } catch (error) {
+      console.error('SeekSpeak: Error parsing player captions:', error);
+      return null;
+    }
   }
 
   parseFromTranscriptPanel() {
@@ -381,13 +488,111 @@ class CaptionFetcher {
       console.warn('SeekSpeak: Failed to get cached captions:', error);
     }
     
+  async fetchCaptionFromUrl(baseUrl) {
+    console.log('SeekSpeak: Fetching caption from URL:', baseUrl);
+    
+    try {
+      // Try different format parameters
+      const formats = ['json3', 'srv3', 'vtt'];
+      
+      for (const fmt of formats) {
+        const url = baseUrl + '&fmt=' + fmt;
+        console.log('SeekSpeak: Trying format:', fmt, 'URL:', url);
+        
+        const response = await fetch(url);
+        
+        if (response.ok) {
+          const responseText = await response.text();
+          console.log('SeekSpeak: Response for format', fmt, 'length:', responseText.length);
+          
+          if (fmt === 'json3') {
+            try {
+              const data = JSON.parse(responseText);
+              if (data.events && data.events.length > 0) {
+                return this.parseTimedTextFormat(data.events);
+              }
+            } catch (e) {
+              console.log('SeekSpeak: JSON parse failed for json3 format');
+            }
+          } else if (fmt === 'vtt') {
+            return this.parseVTTFormat(responseText);
+          } else if (fmt === 'srv3') {
+            return this.parseXMLResponse(responseText);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('SeekSpeak: Error fetching caption from URL:', error);
+    }
+    
     return null;
+  }
+
+  parseVTTFormat(vttText) {
+    console.log('SeekSpeak: Parsing VTT format');
+    
+    try {
+      const lines = vttText.split('\n');
+      const segments = [];
+      
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i].trim();
+        
+        // Look for timestamp lines (e.g., "00:00:01.000 --> 00:00:04.000")
+        if (line.includes('-->')) {
+          const [startStr, endStr] = line.split('-->').map(s => s.trim());
+          const startTime = this.parseVTTTimestamp(startStr);
+          const endTime = this.parseVTTTimestamp(endStr);
+          
+          // Get the text content (next non-empty line)
+          let textLine = '';
+          for (let j = i + 1; j < lines.length && lines[j].trim() !== ''; j++) {
+            if (lines[j].trim() && !lines[j].includes('-->')) {
+              textLine += lines[j].trim() + ' ';
+            }
+          }
+          
+          if (textLine.trim()) {
+            segments.push({
+              startTime: Math.floor(startTime),
+              duration: Math.floor(endTime - startTime),
+              endTime: Math.floor(endTime),
+              text: textLine.trim()
+            });
+          }
+        }
+      }
+      
+      console.log('SeekSpeak: Parsed', segments.length, 'segments from VTT');
+      return segments;
+      
+    } catch (error) {
+      console.error('SeekSpeak: Error parsing VTT:', error);
+      return null;
+    }
+  }
+
+  parseVTTTimestamp(timeStr) {
+    // Parse "00:00:01.000" format
+    const parts = timeStr.split(':');
+    if (parts.length >= 3) {
+      const hours = parseInt(parts[0]) || 0;
+      const minutes = parseInt(parts[1]) || 0;
+      const secondsParts = parts[2].split('.');
+      const seconds = parseInt(secondsParts[0]) || 0;
+      const milliseconds = parseInt(secondsParts[1]) || 0;
+      
+      return hours * 3600 + minutes * 60 + seconds + milliseconds / 1000;
+    }
   }
 
   getCurrentCaptions() {
     return this.captionCache.get(this.currentVideoId) || null;
   }
 }
+
+// Create global instance
+window.captionFetcher = new CaptionFetcher();
 
 // Create global instance
 window.captionFetcher = new CaptionFetcher();
