@@ -488,7 +488,52 @@ class CaptionFetcher {
           transcriptItems = existingTranscriptItems;
         } else {
           // Transcript not open, we need to open it temporarily
-          console.log('SeekSpeak: [DEBUG] Transcript not open - clicking button to extract content');
+          // Enhanced transcript flash elimination - hide areas BEFORE clicking
+        console.log('SeekSpeak: [DEBUG] Pre-hiding all transcript areas to prevent flash');
+        
+        const ultimatePreventFlashStyle = document.createElement('style');
+        ultimatePreventFlashStyle.id = 'seekspeak-ultimate-prevent-flash';
+        ultimatePreventFlashStyle.textContent = `
+          /* ULTIMATE TRANSCRIPT FLASH PREVENTION - Applied BEFORE clicking */
+          #engagement-panel-searchable-transcript,
+          .ytd-engagement-panel-section-list-renderer,
+          ytd-engagement-panel-section-list-renderer,
+          [data-target-id="engagement-panel-searchable-transcript"],
+          tp-yt-paper-dialog,
+          #secondary-inner #panels ytd-engagement-panel-section-list-renderer,
+          #panels.ytd-watch-flexy ytd-engagement-panel-section-list-renderer,
+          #secondary #panels.ytd-watch-flexy,
+          #secondary #panels {
+            display: none !important;
+            opacity: 0 !important;
+            visibility: hidden !important;
+            position: fixed !important;
+            left: -99999px !important;
+            top: -99999px !important;
+            width: 1px !important;
+            height: 1px !important;
+            pointer-events: none !important;
+            z-index: -9999 !important;
+            transform: translateX(-100000px) translateY(-100000px) !important;
+            clip: rect(0 0 0 0) !important;
+            clip-path: inset(100%) !important;
+            overflow: hidden !important;
+          }
+          
+          /* Prevent any engagement panels from affecting layout */
+          ytd-engagement-panel-section-list-renderer,
+          ytd-engagement-panel-section-list-renderer * {
+            display: none !important;
+            opacity: 0 !important;
+            visibility: hidden !important;
+          }
+        `;
+        
+        // Apply IMMEDIATELY before any button clicking
+        document.head.appendChild(ultimatePreventFlashStyle);
+        document.documentElement.classList.add('seekspeak-extraction-mode');
+        
+        console.log('SeekSpeak: [DEBUG] All transcript areas pre-hidden, now clicking button');
           
           // Prepare hiding styles but DON'T apply yet - let content load first
           const preemptiveStyle = document.createElement('style');
@@ -810,6 +855,13 @@ class CaptionFetcher {
       const hideStyle = document.getElementById('seekspeak-preemptive-hide');
       if (hideStyle) {
         hideStyle.remove();
+      }
+      
+      // Remove ultimate flash prevention style
+      const ultimateStyle = document.getElementById('seekspeak-ultimate-prevent-flash');
+      if (ultimateStyle) {
+        ultimateStyle.remove();
+        console.log('SeekSpeak: [DEBUG] Removed ultimate flash prevention style');
       }
     }
     

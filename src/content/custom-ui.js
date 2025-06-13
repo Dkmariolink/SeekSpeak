@@ -241,8 +241,13 @@ class SeekSpeakCustomUI {
     // Create SeekSpeak button
     this.customButton = document.createElement('button');
     this.customButton.className = 'seekspeak-transcript-button';
-    this.customButton.textContent = 'Search Captions';
-    this.customButton.title = 'Open SeekSpeak caption search';
+    this.customButton.innerHTML = `
+      <img src="${chrome.runtime.getURL('assets/icons/icon16.png')}" 
+           alt="SeekSpeak" 
+           style="width: 16px; height: 16px; margin-right: 6px; vertical-align: middle;">
+      Search Captions
+    `;
+    this.customButton.title = 'Open SeekSpeak caption search (click again to close)';
 
     // Add click handler
     this.customButton.addEventListener('click', (e) => {
@@ -271,11 +276,17 @@ class SeekSpeakCustomUI {
   openSeekSpeakSearch() {
     console.log('SeekSpeak: Opening caption search interface');
     
+    // Check if search overlay is already open and toggle it
+    if (window.uiController && window.uiController.isVisible) {
+      window.uiController.hideSearchOverlay();
+      return;
+    }
+    
     // Check if captions are available
     if (window.uiController && window.uiController.captionsAvailable) {
       // Open search overlay directly
-      if (window.uiController.openSearchOverlay) {
-        window.uiController.openSearchOverlay();
+      if (window.uiController.showSearchOverlay) {
+        window.uiController.showSearchOverlay();
       } else {
         // Fallback: trigger keyboard shortcut
         document.dispatchEvent(new KeyboardEvent('keydown', {
@@ -296,8 +307,8 @@ class SeekSpeakCustomUI {
             this.hideLoadingOverlay();
             // Open search after loading
             setTimeout(() => {
-              if (window.uiController && window.uiController.openSearchOverlay) {
-                window.uiController.openSearchOverlay();
+              if (window.uiController && window.uiController.showSearchOverlay) {
+                window.uiController.showSearchOverlay();
               }
             }, 500);
           }).catch((error) => {

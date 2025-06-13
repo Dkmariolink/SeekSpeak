@@ -145,14 +145,18 @@
 .seekspeak-results-container {
   flex: 1;
   min-height: 200px;
-  max-height: 400px;
   overflow-y: auto;
   background: #ffffff;
   position: relative;
+  display: flex;
+  flex-direction: column;
 }
 
 .seekspeak-results {
   padding: 0 8px;
+  flex: 1;
+  overflow-y: auto;
+}
 }
 
 /* Individual result items */

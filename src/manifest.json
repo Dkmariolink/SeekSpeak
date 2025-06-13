@@ -71,7 +71,10 @@
   
   "web_accessible_resources": [
     {
-      "resources": ["content/seekspeak.css"],
+      "resources": [
+        "content/seekspeak.css",
+        "assets/icons/*.png"
+      ],
       "matches": ["https://www.youtube.com/*"]
     }
   ]
