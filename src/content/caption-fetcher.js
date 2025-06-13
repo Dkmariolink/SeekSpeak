@@ -409,25 +409,46 @@ class CaptionFetcher {
           // Transcript not open, we need to open it temporarily
           console.log('SeekSpeak: [DEBUG] Transcript not open - clicking button to extract content');
           
-          // Create a temporary style to make transcript panels invisible during extraction
-          const style = document.createElement('style');
-          style.textContent = `
+          // Prepare hiding styles but DON'T apply yet - let content load first
+          const preemptiveStyle = document.createElement('style');
+          preemptiveStyle.id = 'seekspeak-preemptive-hide';
+          preemptiveStyle.textContent = `
+            /* TRANSCRIPT HIDING - Applied after content loads */
             #engagement-panel-searchable-transcript,
             .ytd-engagement-panel-section-list-renderer,
             ytd-engagement-panel-section-list-renderer,
             [data-target-id="engagement-panel-searchable-transcript"],
-            tp-yt-paper-dialog {
+            tp-yt-paper-dialog,
+            #secondary-inner #panels ytd-engagement-panel-section-list-renderer,
+            #panels.ytd-watch-flexy ytd-engagement-panel-section-list-renderer {
+              display: none !important;
               opacity: 0 !important;
+              visibility: hidden !important;
+              position: fixed !important;
+              left: -99999px !important;
+              top: -99999px !important;
+              width: 1px !important;
+              height: 1px !important;
               pointer-events: none !important;
-              transition: none !important;
+              z-index: -9999 !important;
+              transform: translateX(-100000px) translateY(-100000px) !important;
+              clip: rect(0 0 0 0) !important;
+              clip-path: inset(100%) !important;
+              overflow: hidden !important;
             }
           `;
-          document.head.appendChild(style);
-          
-          console.log('SeekSpeak: [DEBUG] Applied invisible style to prevent flash');
           
           // Click the transcript button to open/load content
           transcriptButton.click();
+          
+          // CRITICAL: Wait for YouTube to populate transcript content before hiding
+          console.log('SeekSpeak: [DEBUG] Waiting for transcript content to load before hiding...');
+          await new Promise(resolve => setTimeout(resolve, 800)); // Allow content to load
+          
+          // NOW apply hiding after content loads
+          console.log('SeekSpeak: [DEBUG] Applying hiding after content load');
+          document.documentElement.classList.add('seekspeak-extraction-mode');
+          document.head.appendChild(preemptiveStyle);
         
         // Wait for content to load with retry mechanism (only if we clicked the button)
         if (!transcriptAlreadyOpen) {
@@ -642,6 +663,14 @@ class CaptionFetcher {
           if (segments.length > 0) {
             console.log('SeekSpeak: [DEBUG] Successfully extracted', segments.length, 'segments from transcript panel');
             
+            // Clean up hiding after successful extraction
+            console.log('SeekSpeak: [DEBUG] Cleaning up hiding after successful extraction');
+            document.documentElement.classList.remove('seekspeak-extraction-mode');
+            const hideStyle = document.getElementById('seekspeak-preemptive-hide');
+            if (hideStyle) {
+              hideStyle.remove();
+            }
+            
             if (transcriptAlreadyOpen) {
               // User opened transcript manually - NEVER hide it
               console.log('SeekSpeak: [DEBUG] Transcript was user-opened - leaving it completely visible');
@@ -649,9 +678,10 @@ class CaptionFetcher {
               // WE opened transcript for extraction - hide it again
               console.log('SeekSpeak: [DEBUG] Closing transcript panel after extraction');
               
-              // Remove the invisible style
-              if (style && style.parentNode) {
-                style.remove();
+              // Remove the hiding style
+              const hideStyle = document.getElementById('seekspeak-preemptive-hide');
+              if (hideStyle) {
+                hideStyle.remove();
               }
               
               // Try to close via button click
@@ -671,10 +701,11 @@ class CaptionFetcher {
             
             return segments;
           } else {
-            // If no segments found, remove invisible style
-            console.log('SeekSpeak: [DEBUG] No segments found, removing invisible style');
-            if (style && style.parentNode) {
-              style.remove();
+            // If no segments found, remove hiding style
+            console.log('SeekSpeak: [DEBUG] No segments found, removing hiding style');
+            const hideStyle = document.getElementById('seekspeak-preemptive-hide');
+            if (hideStyle) {
+              hideStyle.remove();
             }
           }
         } else {
@@ -687,6 +718,18 @@ class CaptionFetcher {
       
     } catch (error) {
       console.error('SeekSpeak: [DEBUG] Error in tryTranscriptPanelAccess:', error);
+    } finally {
+      // CRITICAL: Always clean up hiding styles
+      console.log('SeekSpeak: [DEBUG] Cleaning up transcript hiding');
+      
+      // Remove extraction mode class
+      document.documentElement.classList.remove('seekspeak-extraction-mode');
+      
+      // Remove hiding styles
+      const hideStyle = document.getElementById('seekspeak-preemptive-hide');
+      if (hideStyle) {
+        hideStyle.remove();
+      }
     }
     
     console.log('SeekSpeak: [DEBUG] tryTranscriptPanelAccess returning null');

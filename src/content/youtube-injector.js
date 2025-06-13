@@ -369,11 +369,139 @@ class YouTubeInjector {
   }
 }
 
-// Initialize when the page loads
+// Enhanced initialization system for new tab compatibility
+console.log('SeekSpeak: YouTube Injector script loaded on:', window.location.href);
+console.log('SeekSpeak: Document ready state at load:', document.readyState);
+
+// Enhanced initialization with comprehensive error handling and new tab support
+function initializeSeekSpeak() {
+  try {
+    console.log('SeekSpeak: Attempting initialization on', window.location.href);
+    console.log('SeekSpeak: Document ready state:', document.readyState);
+    console.log('SeekSpeak: Body exists:', !!document.body);
+    console.log('SeekSpeak: Is watch page:', window.location.href.includes('/watch'));
+    
+    // Check if already initialized
+    if (window.seekSpeakInjector) {
+      console.log('SeekSpeak: Already initialized, checking if still valid');
+      
+      // Re-initialize if URL changed (for new tabs)
+      const currentVideoId = extractVideoIdFromUrl();
+      if (currentVideoId && currentVideoId !== window.seekSpeakInjector.currentVideoId) {
+        console.log('SeekSpeak: Video ID changed, re-initializing for new video');
+        window.seekSpeakInjector.currentVideoId = currentVideoId;
+        window.seekSpeakInjector.handlePageChange();
+      }
+      return;
+    }
+    
+    // Only initialize on watch pages
+    if (!window.location.href.includes('/watch')) {
+      console.log('SeekSpeak: Not a watch page, skipping initialization');
+      return;
+    }
+    
+    // Verify all components are loaded
+    const componentsLoaded = window.captionFetcher && 
+                           window.searchEngine && 
+                           window.uiController;
+    
+    if (!componentsLoaded) {
+      console.log('SeekSpeak: Components not all loaded yet, will retry');
+      console.log('SeekSpeak: captionFetcher:', !!window.captionFetcher);
+      console.log('SeekSpeak: searchEngine:', !!window.searchEngine);  
+      console.log('SeekSpeak: uiController:', !!window.uiController);
+      
+      // Retry in 1 second
+      setTimeout(() => {
+        if (!window.seekSpeakInjector) {
+          console.log('SeekSpeak: Retrying initialization after component load delay');
+          initializeSeekSpeak();
+        }
+      }, 1000);
+      return;
+    }
+    
+    console.log('SeekSpeak: All components loaded, creating YouTubeInjector');
+    window.seekSpeakInjector = new YouTubeInjector();
+    console.log('SeekSpeak: YouTubeInjector created successfully');
+    
+    // Mark as successfully initialized
+    window.seekSpeakInitialized = true;
+    
+  } catch (error) {
+    console.error('SeekSpeak: Failed to initialize:', error);
+    console.error('SeekSpeak: Error stack:', error.stack);
+    
+    // Retry after 2 seconds
+    setTimeout(() => {
+      console.log('SeekSpeak: Retrying initialization after error...');
+      if (!window.seekSpeakInjector) {
+        initializeSeekSpeak();
+      }
+    }, 2000);
+  }
+}
+
+// Helper function to extract video ID
+function extractVideoIdFromUrl() {
+  const url = window.location.href;
+  const match = url.match(/[?&]v=([^&]+)/);
+  return match ? match[1] : null;
+}
+
+// Multiple initialization strategies for maximum compatibility
+console.log('SeekSpeak: Setting up initialization strategies');
+
+// Strategy 1: Immediate initialization if page already loaded
 if (document.readyState === 'loading') {
+  console.log('SeekSpeak: Document still loading, waiting for DOMContentLoaded');
   document.addEventListener('DOMContentLoaded', () => {
-    new YouTubeInjector();
+    console.log('SeekSpeak: DOMContentLoaded fired, initializing');
+    setTimeout(initializeSeekSpeak, 100);
   });
 } else {
-  new YouTubeInjector();
+  // Page already loaded
+  console.log('SeekSpeak: Document already loaded, initializing immediately');
+  setTimeout(initializeSeekSpeak, 100);
 }
+
+// Strategy 2: Additional safety net for YouTube SPA navigation
+setTimeout(() => {
+  if (!window.seekSpeakInjector && window.location.href.includes('/watch')) {
+    console.log('SeekSpeak: Safety net initialization triggered for watch page');
+    initializeSeekSpeak();
+  }
+}, 3000);
+
+// Strategy 3: Listen for YouTube navigation events
+document.addEventListener('yt-navigate-finish', () => {
+  console.log('SeekSpeak: YouTube navigation finished, checking if initialization needed');
+  setTimeout(() => {
+    if (window.location.href.includes('/watch') && !window.seekSpeakInjector) {
+      console.log('SeekSpeak: Post-navigation initialization triggered');
+      initializeSeekSpeak();
+    }
+  }, 500);
+});
+
+// Strategy 4: Visibility change detection (for new tabs)
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && window.location.href.includes('/watch')) {
+    console.log('SeekSpeak: Page became visible, checking initialization');
+    if (!window.seekSpeakInjector) {
+      console.log('SeekSpeak: Visibility-based initialization triggered');
+      setTimeout(initializeSeekSpeak, 200);
+    }
+  }
+});
+
+// Strategy 5: Focus event detection (for new tabs)
+window.addEventListener('focus', () => {
+  if (window.location.href.includes('/watch') && !window.seekSpeakInjector) {
+    console.log('SeekSpeak: Window focus initialization triggered');
+    setTimeout(initializeSeekSpeak, 200);
+  }
+});
+
+console.log('SeekSpeak: All initialization strategies set up');
