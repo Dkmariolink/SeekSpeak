@@ -128,7 +128,6 @@ class UIController {
     this.overlay.className = 'seekspeak-overlay';
     
     this.overlay.innerHTML = `
-      <div class="seekspeak-backdrop"></div>
       <div class="seekspeak-modal">
         <div class="seekspeak-header">
           <h2>Search Video Captions</h2>
@@ -178,7 +177,6 @@ class UIController {
   setupEventListeners() {
     const input = this.overlay.querySelector('.seekspeak-input');
     const closeBtn = this.overlay.querySelector('.seekspeak-close');
-    const backdrop = this.overlay.querySelector('.seekspeak-backdrop');
     const results = this.overlay.querySelector('.seekspeak-results');
 
     // Search input with debouncing
@@ -193,7 +191,6 @@ class UIController {
 
     // Close overlay events
     closeBtn.addEventListener('click', () => this.hideSearchOverlay());
-    backdrop.addEventListener('click', () => this.hideSearchOverlay());
 
     // Keyboard navigation
     input.addEventListener('keydown', (e) => {

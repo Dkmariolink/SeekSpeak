@@ -3,130 +3,121 @@
  * CSS for the search overlay interface
  */
 
-/* Base overlay container - complete isolation from YouTube styles */
+/* Right-side panel - no backdrop blur, positioned to right */
 .seekspeak-overlay {
   all: initial;
   position: fixed !important;
   top: 0;
-  left: 0;
-  width: 100vw;
+  right: 0;
+  width: 400px;
   height: 100vh;
   z-index: 10000;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-family: "Roboto", "Arial", sans-serif;
   font-size: 14px;
   line-height: 1.4;
-  color: #212121;
-  background: rgba(0, 0, 0, 0.75);
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  color: var(--yt-spec-text-primary);
+  background: var(--yt-spec-base-background);
+  border-left: 1px solid var(--yt-spec-10-percent-layer);
   opacity: 0;
   visibility: hidden;
-  transition: opacity 0.2s cubic-bezier(0.4, 0.0, 0.2, 1),
-              visibility 0.2s cubic-bezier(0.4, 0.0, 0.2, 1);
-  backdrop-filter: blur(4px);
+  transform: translateX(100%);
+  transition: opacity 0.2s ease, visibility 0.2s ease, transform 0.2s ease;
+  box-shadow: -2px 0 8px rgba(0, 0, 0, 0.1);
 }
 
 .seekspeak-overlay.show {
   opacity: 1;
   visibility: visible;
+  transform: translateX(0);
 }
 
-/* Backdrop for closing overlay */
+/* Remove backdrop entirely */
 .seekspeak-backdrop {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  cursor: pointer;
+  display: none;
 }
 
-/* Main modal window */
+/* Main panel - full height right sidebar */
 .seekspeak-modal {
   position: relative;
-  background: #ffffff;
-  border-radius: 12px;
-  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.2), 
-              0 8px 16px rgba(0, 0, 0, 0.1);
-  width: min(650px, 90vw);
-  max-height: 80vh;
+  background: var(--yt-spec-base-background);
+  width: 100%;
+  height: 100%;
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  transform: scale(0.95);
-  transition: transform 0.2s cubic-bezier(0.4, 0.0, 0.2, 1);
+  border-radius: 0;
+  box-shadow: none;
 }
 
 .seekspeak-overlay.show .seekspeak-modal {
-  transform: scale(1);
+  /* Remove scaling animation */
 }
 
-/* Header section */
+/* Header section - YouTube style */
 .seekspeak-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 20px 24px 16px 24px;
-  border-bottom: 1px solid #e8eaed;
-  background: #f8f9fa;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--yt-spec-10-percent-layer);
+  background: var(--yt-spec-base-background);
 }
 
 .seekspeak-header h2 {
   margin: 0;
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 500;
-  color: #3c4043;
+  color: var(--yt-spec-text-primary);
 }
 
 .seekspeak-close {
   background: none;
   border: none;
-  font-size: 24px;
+  font-size: 20px;
   line-height: 1;
-  color: #5f6368;
+  color: var(--yt-spec-text-secondary);
   cursor: pointer;
-  padding: 4px;
+  padding: 8px;
   border-radius: 50%;
   transition: background-color 0.15s ease, color 0.15s ease;
-  width: 32px;
-  height: 32px;
+  width: 36px;
+  height: 36px;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
 .seekspeak-close:hover {
-  background-color: #f1f3f4;
-  color: #1a73e8;
+  background-color: var(--yt-spec-button-chip-background-hover);
+  color: var(--yt-spec-text-primary);
 }
 
-/* Search input section */
+/* Search input section - YouTube style */
 .seekspeak-search-container {
-  padding: 20px 24px 16px 24px;
-  background: #ffffff;
+  padding: 16px 20px;
+  background: var(--yt-spec-base-background);
 }
 
 .seekspeak-input {
   width: 100%;
-  padding: 12px 16px;
-  border: 2px solid #dadce0;
-  border-radius: 8px;
-  font-size: 16px;
+  padding: 10px 12px;
+  border: 1px solid var(--yt-spec-10-percent-layer);
+  border-radius: 20px;
+  font-size: 14px;
   font-family: inherit;
-  background: #ffffff;
-  color: #202124;
+  background: var(--yt-spec-base-background);
+  color: var(--yt-spec-text-primary);
   outline: none;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  transition: border-color 0.2s ease;
+  box-sizing: border-box;
 }
 
 .seekspeak-input:focus {
-  border-color: #ff0000;
-  box-shadow: 0 0 0 2px rgba(255, 0, 0, 0.2);
+  border-color: var(--yt-spec-call-to-action);
 }
 
 .seekspeak-input::placeholder {
-  color: #5f6368;
+  color: var(--yt-spec-text-secondary);
 }
 
 .seekspeak-search-info {
@@ -138,67 +129,66 @@
 
 .seekspeak-shortcut {
   font-size: 12px;
-  color: #5f6368;
+  color: var(--yt-spec-text-secondary);
 }
 
-/* Results container */
+/* Results container - YouTube style */
 .seekspeak-results-container {
   flex: 1;
   min-height: 200px;
   overflow-y: auto;
-  background: #ffffff;
+  background: var(--yt-spec-base-background);
   position: relative;
   display: flex;
   flex-direction: column;
 }
 
 .seekspeak-results {
-  padding: 0 8px;
+  padding: 8px 16px;
   flex: 1;
   overflow-y: auto;
 }
-}
 
-/* Individual result items */
+/* Individual result items - YouTube style */
 .seekspeak-result-item {
   display: flex;
   flex-direction: column;
-  padding: 12px 16px;
+  padding: 12px;
   margin: 4px 0;
   border-radius: 8px;
   cursor: pointer;
-  transition: background-color 0.15s ease, transform 0.15s ease;
+  transition: background-color 0.15s ease;
   border: 1px solid transparent;
 }
 
 .seekspeak-result-item:hover {
-  background-color: #f8f9fa;
-  transform: translateX(2px);
+  background-color: var(--yt-spec-button-chip-background-hover);
 }
 
 .seekspeak-result-item.selected {
-  background-color: #ffe6e6;
-  border-color: #ff0000;
+  background-color: var(--yt-spec-brand-background-primary);
+  border-color: var(--yt-spec-call-to-action);
+  color: var(--yt-spec-text-primary-inverse);
 }
 
 .seekspeak-result-time {
   font-size: 12px;
   font-weight: 500;
-  color: #ff0000;
+  color: var(--yt-spec-call-to-action);
   margin-bottom: 4px;
   font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
 }
 
 .seekspeak-result-text {
   font-size: 14px;
-  color: #202124;
+  color: var(--yt-spec-text-primary);
   line-height: 1.4;
   margin-bottom: 4px;
 }
 
 .seekspeak-result-text mark {
-  background-color: #fbbc04;
-  color: #1f1f1f;
+  background-color: var(--yt-spec-wordmark-text);
+  color: var(--yt-spec-text-primary-inverse);
   padding: 1px 2px;
   border-radius: 2px;
   font-weight: 500;
@@ -206,13 +196,13 @@
 
 .seekspeak-result-context {
   font-size: 12px;
-  color: #5f6368;
+  color: var(--yt-spec-text-secondary);
   line-height: 1.3;
   margin-top: 4px;
 }
 
 .seekspeak-result-context strong {
-  color: #202124;
+  color: var(--yt-spec-text-primary);
   font-weight: 500;
 }
 
@@ -271,19 +261,19 @@
   color: #5f6368;
 }
 
-/* Footer section */
+/* Footer section - YouTube style */
 .seekspeak-footer {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 12px 24px;
-  border-top: 1px solid #e8eaed;
-  background: #f8f9fa;
+  padding: 12px 20px;
+  border-top: 1px solid var(--yt-spec-10-percent-layer);
+  background: var(--yt-spec-base-background);
 }
 
 .seekspeak-status {
   font-size: 13px;
-  color: #5f6368;
+  color: var(--yt-spec-text-secondary);
 }
 
 .seekspeak-credits {
@@ -291,335 +281,88 @@
 }
 
 .seekspeak-credits a {
-  color: #ff0000;
+  color: var(--yt-spec-call-to-action);
   text-decoration: none;
   transition: color 0.15s ease;
 }
 
 .seekspeak-credits a:hover {
-  color: #cc0000;
   text-decoration: underline;
 }
 
-/* Custom scrollbar */
+/* Remove scrollbar styles and simplify */
 .seekspeak-results-container::-webkit-scrollbar {
   width: 8px;
 }
 
 .seekspeak-results-container::-webkit-scrollbar-track {
-  background: #f1f3f4;
-  border-radius: 4px;
+  background: var(--yt-spec-base-background);
 }
 
 .seekspeak-results-container::-webkit-scrollbar-thumb {
-  background: #dadce0;
+  background: var(--yt-spec-10-percent-layer);
   border-radius: 4px;
-  transition: background-color 0.2s ease;
 }
 
 .seekspeak-results-container::-webkit-scrollbar-thumb:hover {
-  background: #bdc1c6;
+  background: var(--yt-spec-20-percent-layer);
 }
 
-/* ============================================
-   DARK THEME STYLES
-   ============================================ */
-
-.seekspeak-theme-dark .seekspeak-modal {
-  background: #202124;
-  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.4), 
-              0 8px 16px rgba(0, 0, 0, 0.2);
+/* Loading and no results states - YouTube style */
+.seekspeak-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  color: var(--yt-spec-text-secondary);
+  font-size: 14px;
 }
 
-.seekspeak-theme-dark .seekspeak-header {
-  background: #292a2d;
-  border-bottom-color: #3c4043;
+.seekspeak-spinner {
+  width: 24px;
+  height: 24px;
+  border: 2px solid var(--yt-spec-10-percent-layer);
+  border-top-color: var(--yt-spec-call-to-action);
+  border-radius: 50%;
+  animation: seekspeak-spin 1s linear infinite;
+  margin-bottom: 12px;
 }
 
-.seekspeak-theme-dark .seekspeak-header h2 {
-  color: #e8eaed;
-}
-
-.seekspeak-theme-dark .seekspeak-close {
-  color: #9aa0a6;
-}
-
-.seekspeak-theme-dark .seekspeak-close:hover {
-  background-color: #3c4043;
-  color: #8ab4f8;
-}
-
-.seekspeak-theme-dark .seekspeak-search-container {
-  background: #202124;
-}
-
-.seekspeak-theme-dark .seekspeak-input {
-  background: #303134;
-  border-color: #5f6368;
-  color: #e8eaed;
-}
-
-.seekspeak-theme-dark .seekspeak-input:focus {
-  border-color: #ff6666;
-  box-shadow: 0 0 0 2px rgba(255, 102, 102, 0.2);
-}
-
-.seekspeak-theme-dark .seekspeak-input::placeholder {
-  color: #9aa0a6;
-}
-
-.seekspeak-theme-dark .seekspeak-shortcut {
-  color: #9aa0a6;
-}
-
-.seekspeak-theme-dark .seekspeak-results-container {
-  background: #202124;
-}
-
-.seekspeak-theme-dark .seekspeak-result-item:hover {
-  background-color: #292a2d;
-}
-
-.seekspeak-theme-dark .seekspeak-result-item.selected {
-  background-color: #ff0000;
-  border-color: #ff6666;
-}
-
-.seekspeak-theme-dark .seekspeak-result-time {
-  color: #ff6666;
-}
-
-.seekspeak-theme-dark .seekspeak-result-text {
-  color: #e8eaed;
-}
-
-.seekspeak-theme-dark .seekspeak-result-text mark {
-  background-color: #fdd663;
-  color: #202124;
-}
-
-.seekspeak-theme-dark .seekspeak-result-context {
-  color: #9aa0a6;
-}
-
-.seekspeak-theme-dark .seekspeak-result-context strong {
-  color: #e8eaed;
-}
-
-.seekspeak-theme-dark .seekspeak-loading {
-  color: #9aa0a6;
-}
-
-.seekspeak-theme-dark .seekspeak-spinner {
-  border-color: #3c4043;
-  border-top-color: #ff6666;
-}
-
-.seekspeak-theme-dark .seekspeak-no-results-text {
-  color: #e8eaed;
-}
-
-.seekspeak-theme-dark .seekspeak-no-results-hint {
-  color: #9aa0a6;
-}
-
-.seekspeak-theme-dark .seekspeak-footer {
-  background: #292a2d;
-  border-top-color: #3c4043;
-}
-
-.seekspeak-theme-dark .seekspeak-status {
-  color: #9aa0a6;
-}
-
-.seekspeak-theme-dark .seekspeak-credits a {
-  color: #ff6666;
-}
-
-.seekspeak-theme-dark .seekspeak-credits a:hover {
-  color: #ff9999;
-}
-
-/* Dark theme scrollbar */
-.seekspeak-theme-dark .seekspeak-results-container::-webkit-scrollbar-track {
-  background: #3c4043;
-}
-
-.seekspeak-theme-dark .seekspeak-results-container::-webkit-scrollbar-thumb {
-  background: #5f6368;
-}
-
-.seekspeak-theme-dark .seekspeak-results-container::-webkit-scrollbar-thumb:hover {
-  background: #80868b;
-}
-
-/* ============================================
-   RESPONSIVE DESIGN
-   ============================================ */
-
-/* Tablet styles */
-@media (max-width: 768px) {
-  .seekspeak-modal {
-    width: 95vw;
-    max-height: 85vh;
-    margin: 20px;
-  }
-  
-  .seekspeak-header {
-    padding: 16px 20px 12px 20px;
-  }
-  
-  .seekspeak-header h2 {
-    font-size: 16px;
-  }
-  
-  .seekspeak-search-container {
-    padding: 16px 20px 12px 20px;
-  }
-  
-  .seekspeak-input {
-    font-size: 16px; /* Prevent zoom on iOS */
-    padding: 14px 16px;
-  }
-  
-  .seekspeak-result-item {
-    padding: 14px 16px;
-  }
-  
-  .seekspeak-footer {
-    padding: 12px 20px;
+@keyframes seekspeak-spin {
+  to {
+    transform: rotate(360deg);
   }
 }
 
-/* Mobile styles */
-@media (max-width: 480px) {
-  .seekspeak-overlay {
-    padding: 10px;
-  }
-  
-  .seekspeak-modal {
-    width: 100%;
-    height: 100%;
-    max-height: none;
-    margin: 0;
-    border-radius: 0;
-  }
-  
-  .seekspeak-header {
-    padding: 12px 16px;
-  }
-  
-  .seekspeak-header h2 {
-    font-size: 16px;
-  }
-  
-  .seekspeak-search-container {
-    padding: 12px 16px;
-  }
-  
-  .seekspeak-input {
-    padding: 12px 14px;
-  }
-  
-  .seekspeak-result-item {
-    padding: 12px 14px;
-    margin: 2px 0;
-  }
-  
-  .seekspeak-result-time {
-    font-size: 11px;
-  }
-  
-  .seekspeak-result-text {
-    font-size: 13px;
-  }
-  
-  .seekspeak-result-context {
-    font-size: 11px;
-  }
-  
-  .seekspeak-footer {
-    padding: 10px 16px;
-  }
-  
-  .seekspeak-status {
-    font-size: 12px;
-  }
-  
-  .seekspeak-credits {
-    font-size: 11px;
-  }
+.seekspeak-no-results {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  text-align: center;
 }
 
-/* Very small screens */
-@media (max-height: 600px) {
-  .seekspeak-modal {
-    max-height: 95vh;
-  }
-  
-  .seekspeak-results-container {
-    min-height: 150px;
-    max-height: 250px;
-  }
-  
-  .seekspeak-no-results {
-    padding: 20px;
-  }
-  
-  .seekspeak-loading {
-    padding: 20px;
-  }
+.seekspeak-no-results-icon {
+  font-size: 32px;
+  margin-bottom: 12px;
+  opacity: 0.6;
 }
 
-/* ============================================
-   ACCESSIBILITY IMPROVEMENTS
-   ============================================ */
-
-/* Focus indicators */
-.seekspeak-result-item:focus-visible {
-  outline: 2px solid #1a73e8;
-  outline-offset: 2px;
+.seekspeak-no-results-text {
+  font-size: 16px;
+  color: var(--yt-spec-text-primary);
+  margin-bottom: 8px;
+  font-weight: 500;
 }
 
-.seekspeak-theme-dark .seekspeak-result-item:focus-visible {
-  outline-color: #8ab4f8;
+.seekspeak-no-results-hint {
+  font-size: 14px;
+  color: var(--yt-spec-text-secondary);
 }
 
-/* High contrast mode support */
-@media (prefers-contrast: high) {
-  .seekspeak-modal {
-    border: 2px solid;
-  }
-  
-  .seekspeak-result-item {
-    border-width: 2px;
-  }
-  
-  .seekspeak-input {
-    border-width: 3px;
-  }
-}
-
-/* Reduced motion support */
-@media (prefers-reduced-motion: reduce) {
-  .seekspeak-overlay,
-  .seekspeak-modal,
-  .seekspeak-result-item,
-  .seekspeak-close,
-  .seekspeak-input {
-    transition: none;
-  }
-  
-  .seekspeak-spinner {
-    animation: none;
-    border-top-color: transparent;
-  }
-}
-
-/* ============================================
-   UTILITY CLASSES
-   ============================================ */
-
+/* Utility classes */
 .seekspeak-hidden {
   display: none !important;
 }
@@ -634,9 +377,4 @@
   clip: rect(0, 0, 0, 0) !important;
   white-space: nowrap !important;
   border: 0 !important;
-}
-
-/* Prevent body scroll when overlay is open */
-body.seekspeak-no-scroll {
-  overflow: hidden;
 }
