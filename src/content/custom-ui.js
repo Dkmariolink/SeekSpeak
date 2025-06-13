@@ -1,280 +1,320 @@
 /**
- * SEEKSPEAK CUSTOM UI SYSTEM
- * Professional loading overlay and enhanced transcript button
+ * SeekSpeak Custom UI - Simple Button Integration
  */
 
 class SeekSpeakCustomUI {
   constructor() {
-    this.loadingOverlay = null;
-    this.customButton = null;
-    this.isLoadingActive = false;
-    this.injectCustomStyles();
+    this.button = null;
+    this.captionsReady = false;
+    this.isLoading = false;
+    this.injectStyles();
   }
 
-  // Inject custom CSS styles for loading UI and SeekSpeak button
-  injectCustomStyles() {
-    // Remove existing styles if present
-    const existingStyles = document.getElementById('seekspeak-custom-ui-styles');
-    if (existingStyles) {
-      existingStyles.remove();
-    }
+  injectStyles() {
+    if (document.getElementById('seekspeak-button-styles')) return;
 
     const style = document.createElement('style');
-    style.id = 'seekspeak-custom-ui-styles';
+    style.id = 'seekspeak-button-styles';
     style.textContent = `
-      /* SeekSpeak Custom Loading Overlay */
-      .seekspeak-loading-overlay {
-        position: fixed;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        background: linear-gradient(135deg, #ff0000 0%, #cc0000 100%);
-        color: white;
-        padding: 24px 32px;
-        border-radius: 12px;
-        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-        z-index: 10000;
-        font-family: 'YouTube Sans', 'Roboto', Arial, sans-serif;
-        text-align: center;
-        backdrop-filter: blur(10px);
-        border: 2px solid rgba(255, 255, 255, 0.1);
-        min-width: 300px;
-        opacity: 0;
-        animation: seekspeak-fade-in 0.3s ease-out forwards;
-      }
-
-      /* Fade in animation */
-      @keyframes seekspeak-fade-in {
-        from {
-          opacity: 0;
-          transform: translate(-50%, -60%);
-        }
-        to {
-          opacity: 1;
-          transform: translate(-50%, -50%);
-        }
-      }
-
-      /* SeekSpeak Logo */
-      .seekspeak-logo {
-        font-size: 24px;
-        font-weight: bold;
-        margin-bottom: 12px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: 8px;
-      }
-
-      .seekspeak-logo::before {
-        content: "🔍";
-        font-size: 28px;
-      }
-
-      /* Loading message */
-      .seekspeak-loading-message {
-        font-size: 16px;
-        margin-bottom: 16px;
-        opacity: 0.9;
-      }
-
-      /* Custom spinner */
-      .seekspeak-spinner {
-        width: 40px;
-        height: 40px;
-        border: 3px solid rgba(255, 255, 255, 0.3);
-        border-top: 3px solid white;
-        border-radius: 50%;
-        margin: 0 auto;
-        animation: seekspeak-spin 1s linear infinite;
-      }
-
-      @keyframes seekspeak-spin {
-        0% { transform: rotate(0deg); }
-        100% { transform: rotate(360deg); }
-      }
-
-      /* Progress indicator */
-      .seekspeak-progress {
-        margin-top: 12px;
-        font-size: 14px;
-        opacity: 0.8;
-      }
-
-      /* SeekSpeak Custom Transcript Button */
-      .seekspeak-transcript-button {
+      .seekspeak-button {
         display: inline-flex;
         align-items: center;
-        gap: 6px;
-        background: #ff0000;
-        color: white;
-        border: none;
-        padding: 8px 12px;
+        gap: 8px;
+        background: var(--yt-spec-button-chip-background-hover);
+        color: var(--yt-spec-text-primary);
+        border: 1px solid var(--yt-spec-10-percent-layer);
+        padding: 8px 16px;
         border-radius: 18px;
         font-size: 14px;
         font-weight: 500;
         cursor: pointer;
-        margin-left: 8px;
-        transition: all 0.2s ease;
-        font-family: 'YouTube Sans', 'Roboto', Arial, sans-serif;
-        text-decoration: none;
-        box-shadow: 0 2px 8px rgba(255, 0, 0, 0.2);
+        margin-left: 12px;
+        transition: all 0.1s ease;
+        font-family: "Roboto", "Arial", sans-serif;
+        height: 36px;
+        min-width: 140px;
+        justify-content: center;
+        box-sizing: border-box;
       }
 
-      .seekspeak-transcript-button:hover {
-        background: #cc0000;
-        transform: translateY(-1px);
-        box-shadow: 0 4px 12px rgba(255, 0, 0, 0.3);
+      .seekspeak-button:hover:not(.loading):not(.disabled) {
+        background: var(--yt-spec-button-chip-background-hover);
+        border-color: var(--yt-spec-call-to-action);
       }
 
-      .seekspeak-transcript-button:active {
-        transform: translateY(0);
+      .seekspeak-button.disabled {
+        background: var(--yt-spec-button-chip-background-disabled);
+        color: var(--yt-spec-text-disabled);
+        border-color: var(--yt-spec-10-percent-layer);
+        cursor: not-allowed;
+        opacity: 0.6;
       }
 
-      .seekspeak-transcript-button::before {
-        content: "⚡";
-        font-size: 16px;
-      }
-
-      /* Hide during SeekSpeak loading */
-      .seekspeak-loading-active .seekspeak-transcript-button {
-        opacity: 0.5;
+      .seekspeak-button.loading {
+        background: var(--yt-spec-button-chip-background-hover);
+        color: var(--yt-spec-text-secondary);
+        cursor: not-allowed;
         pointer-events: none;
       }
 
-      /* Responsive adjustments */
-      @media (max-width: 768px) {
-        .seekspeak-loading-overlay {
-          width: 90%;
-          max-width: 300px;
-          padding: 20px;
+      .seekspeak-icon {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 18px;
+        height: 18px;
+        border-radius: 3px;
+        line-height: 1;
+      }
+
+      .seekspeak-icon img {
+        width: 16px;
+        height: 16px;
+        border-radius: 2px;
+      }
+
+      .seekspeak-button.disabled .seekspeak-icon {
+        opacity: 0.5;
+      }
+
+      .seekspeak-button.loading .seekspeak-icon {
+        animation: seekspeak-pulse 1.2s ease-in-out infinite;
+      }
+
+      @keyframes seekspeak-pulse {
+        0%, 100% { 
+          opacity: 1;
+          transform: scale(1);
         }
-        
-        .seekspeak-transcript-button {
-          padding: 6px 10px;
-          font-size: 13px;
+        50% { 
+          opacity: 0.6;
+          transform: scale(1.1);
         }
+      }
+
+      /* Loading dots animation */
+      .seekspeak-loading-dots {
+        display: inline-block;
+      }
+
+      .seekspeak-loading-dots::after {
+        content: '';
+        animation: seekspeak-dots 1.5s infinite;
+      }
+
+      @keyframes seekspeak-dots {
+        0%, 20% { content: ''; }
+        25%, 45% { content: '.'; }
+        50%, 70% { content: '..'; }
+        75%, 95% { content: '...'; }
+      }
+
+      /* Ensure proper flex layout with subscribe button */
+      ytd-subscribe-button-renderer {
+        margin-right: 0 !important;
       }
     `;
     document.head.appendChild(style);
   }
 
-  // Show custom loading overlay
-  showLoadingOverlay(message = "Storing Captions...") {
-    if (this.isLoadingActive) return;
-    
-    this.isLoadingActive = true;
-    document.body.classList.add('seekspeak-loading-active');
+  createButton() {
+    if (this.button) return;
 
-    this.loadingOverlay = document.createElement('div');
-    this.loadingOverlay.className = 'seekspeak-loading-overlay';
-    this.loadingOverlay.innerHTML = `
-      <div class="seekspeak-logo">SeekSpeak</div>
-      <div class="seekspeak-loading-message">${message}</div>
-      <div class="seekspeak-spinner"></div>
-      <div class="seekspeak-progress">Extracting video captions...</div>
-    `;
-
-    document.body.appendChild(this.loadingOverlay);
-    
-    console.log('SeekSpeak: Custom loading overlay shown');
-  }
-
-  // Update loading progress
-  updateLoadingProgress(message) {
-    if (this.loadingOverlay) {
-      const progressElement = this.loadingOverlay.querySelector('.seekspeak-progress');
-      if (progressElement) {
-        progressElement.textContent = message;
-      }
-    }
-  }
-
-  // Hide loading overlay
-  hideLoadingOverlay() {
-    if (!this.isLoadingActive) return;
-
-    this.isLoadingActive = false;
-    document.body.classList.remove('seekspeak-loading-active');
-
-    if (this.loadingOverlay) {
-      this.loadingOverlay.style.animation = 'seekspeak-fade-in 0.3s ease-out reverse';
-      setTimeout(() => {
-        if (this.loadingOverlay && this.loadingOverlay.parentNode) {
-          this.loadingOverlay.remove();
-          this.loadingOverlay = null;
-        }
-      }, 300);
-    }
-    
-    console.log('SeekSpeak: Custom loading overlay hidden');
-  }
-
-  // Add SeekSpeak button next to YouTube's transcript button
-  addSeekSpeakButton() {
-    // Remove existing button if present
-    if (this.customButton) {
-      this.customButton.remove();
-    }
-
-    // Find YouTube's transcript button
-    const transcriptSelectors = [
-      'button[aria-label*="Show transcript"]',
-      'button[aria-label*="transcript" i]',
-      'ytd-button-renderer button[aria-label*="transcript" i]',
-      '#description button[aria-label*="transcript" i]'
+    // Find the subscribe button container more precisely
+    const subscribeSelectors = [
+      'ytd-subscribe-button-renderer',
+      '#subscribe-button ytd-subscribe-button-renderer',
+      '#subscribe-button'
     ];
 
-    let youtubeButton = null;
-    for (const selector of transcriptSelectors) {
-      youtubeButton = document.querySelector(selector);
-      if (youtubeButton) break;
+    let subscribeElement = null;
+    for (const selector of subscribeSelectors) {
+      subscribeElement = document.querySelector(selector);
+      if (subscribeElement) break;
     }
 
-    if (!youtubeButton) {
-      console.log('SeekSpeak: YouTube transcript button not found, will retry');
-      // Retry after 2 seconds
-      setTimeout(() => this.addSeekSpeakButton(), 2000);
+    if (!subscribeElement) {
+      console.log('SeekSpeak: Subscribe button not found, will retry');
+      setTimeout(() => this.createButton(), 2000);
       return;
     }
 
+    // Find the container that holds the subscribe button
+    let container = subscribeElement.parentNode;
+    
+    // Make sure container can handle flex layout
+    if (container) {
+      container.style.display = 'flex';
+      container.style.alignItems = 'center';
+      container.style.gap = '12px';
+    }
+
     // Create SeekSpeak button
-    this.customButton = document.createElement('button');
-    this.customButton.className = 'seekspeak-transcript-button';
-    this.customButton.innerHTML = `
-      <img src="${chrome.runtime.getURL('assets/icons/icon16.png')}" 
-           alt="SeekSpeak" 
-           style="width: 16px; height: 16px; margin-right: 6px; vertical-align: middle;">
-      Search Captions
+    this.button = document.createElement('button');
+    this.button.className = 'seekspeak-button loading'; // Start in loading state
+    this.button.title = 'Loading captions, please wait...';
+
+    // Try to get the icon URL, fallback to text if extension API not available
+    let iconHTML = '';
+    try {
+      if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.getURL) {
+        const iconUrl = chrome.runtime.getURL('assets/icons/icon16.png');
+        iconHTML = `<img src="${iconUrl}" alt="SeekSpeak" style="width: 16px; height: 16px;">`;
+      } else {
+        // Fallback to search icon if chrome API not available
+        iconHTML = `<span style="font-size: 14px;">🔍</span>`;
+      }
+    } catch (error) {
+      console.log('SeekSpeak: Chrome runtime not available, using fallback icon');
+      iconHTML = `<span style="font-size: 14px;">🔍</span>`;
+    }
+    
+    this.button.innerHTML = `
+      <span class="seekspeak-icon">${iconHTML}</span>
+      <span>Loading<span class="seekspeak-loading-dots"></span></span>
     `;
-    this.customButton.title = 'Open SeekSpeak caption search (click again to close)';
 
     // Add click handler
-    this.customButton.addEventListener('click', (e) => {
+    this.button.addEventListener('click', (e) => {
       e.preventDefault();
       e.stopPropagation();
       this.openSeekSpeakSearch();
     });
 
-    // Insert after YouTube's button
-    const container = youtubeButton.parentNode;
-    if (container) {
-      // Try to insert in the same container
-      if (youtubeButton.nextSibling) {
-        container.insertBefore(this.customButton, youtubeButton.nextSibling);
-      } else {
-        container.appendChild(this.customButton);
-      }
-      
-      console.log('SeekSpeak: Custom transcript button added');
+    // Insert after subscribe button
+    if (subscribeElement.nextSibling) {
+      container.insertBefore(this.button, subscribeElement.nextSibling);
     } else {
-      console.log('SeekSpeak: Could not find container for custom button');
+      container.appendChild(this.button);
+    }
+    
+    console.log('SeekSpeak: Button added next to subscribe');
+    
+    // Set initial loading state
+    this.isLoading = true;
+    this.captionsReady = false;
+    
+    // Check if captions are already available after a brief delay
+    setTimeout(() => this.checkExistingCaptions(), 1000);
+  }
+
+  // Check if captions are already loaded and update button state accordingly
+  checkExistingCaptions() {
+    console.log('SeekSpeak: Checking for existing captions');
+    
+    // Check if search engine has captions ready
+    if (window.searchEngine && window.searchEngine.isReady && window.searchEngine.isReady()) {
+      console.log('SeekSpeak: Found existing captions, updating button to ready state');
+      this.updateButtonState('ready');
+      return;
+    }
+    
+    // Check if UI controller has captions available
+    if (window.uiController && window.uiController.captionsAvailable) {
+      console.log('SeekSpeak: UI Controller reports captions available');
+      this.updateButtonState('ready');
+      return;
+    }
+    
+    // Check if caption fetcher has cached data
+    if (window.captionFetcher && window.captionFetcher.getCurrentCaptions) {
+      const captions = window.captionFetcher.getCurrentCaptions();
+      if (captions && captions.length > 0) {
+        console.log('SeekSpeak: Found cached captions');
+        this.updateButtonState('ready');
+        return;
+      }
+    }
+    
+    // If no captions found, trigger loading process
+    console.log('SeekSpeak: No existing captions found, starting fetch process');
+    this.startCaptionFetching();
+  }
+
+  // Start the caption fetching process with loading state
+  startCaptionFetching() {
+    if (this.isLoading) {
+      console.log('SeekSpeak: Already loading captions');
+      return;
+    }
+
+    this.updateButtonState('loading');
+    
+    // Try to trigger caption loading
+    if (window.captionFetcher && window.captionFetcher.init) {
+      const videoId = this.extractVideoId();
+      if (videoId) {
+        console.log('SeekSpeak: Starting caption fetch for video:', videoId);
+        
+        window.captionFetcher.init(videoId).then((result) => {
+          if (result && result.segments && result.segments.length > 0) {
+            console.log('SeekSpeak: Captions loaded successfully');
+            this.updateButtonState('ready');
+          } else {
+            console.log('SeekSpeak: No captions available for this video');
+            this.updateButtonState('disabled', 'No Captions');
+          }
+        }).catch((error) => {
+          console.error('SeekSpeak: Error loading captions:', error);
+          this.updateButtonState('disabled', 'No Captions');
+        });
+      } else {
+        console.error('SeekSpeak: Could not extract video ID');
+        this.updateButtonState('disabled', 'No Captions');
+      }
+    } else {
+      console.error('SeekSpeak: CaptionFetcher not available');
+      this.updateButtonState('disabled', 'No Captions');
     }
   }
 
-  // Open SeekSpeak search interface
+  updateButtonState(state, message = '') {
+    if (!this.button) return;
+
+    const textSpan = this.button.querySelector('span:last-child');
+    if (!textSpan) return;
+
+    // Remove all previous state classes
+    this.button.classList.remove('loading', 'disabled');
+
+    switch (state) {
+      case 'loading':
+        this.button.className = 'seekspeak-button loading';
+        textSpan.innerHTML = 'Loading<span class="seekspeak-loading-dots"></span>';
+        this.isLoading = true;
+        this.captionsReady = false;
+        this.button.title = 'Loading captions, please wait...';
+        break;
+        
+      case 'ready':
+        this.button.className = 'seekspeak-button';
+        textSpan.innerHTML = 'Search Captions';
+        this.isLoading = false;
+        this.captionsReady = true;
+        this.button.title = 'Search video captions with SeekSpeak (click again to close)';
+        break;
+        
+      case 'disabled':
+        this.button.className = 'seekspeak-button disabled';
+        textSpan.innerHTML = message || 'No Captions';
+        this.isLoading = false;
+        this.captionsReady = false;
+        this.button.title = 'No captions available for this video';
+        break;
+    }
+  }
+
   openSeekSpeakSearch() {
     console.log('SeekSpeak: Opening caption search interface');
+    
+    // Prevent clicking if loading or disabled
+    if (this.isLoading || !this.captionsReady) {
+      console.log('SeekSpeak: Button click ignored - not ready:', { 
+        isLoading: this.isLoading, 
+        captionsReady: this.captionsReady 
+      });
+      return;
+    }
     
     // Check if search overlay is already open and toggle it
     if (window.uiController && window.uiController.isVisible) {
@@ -282,41 +322,16 @@ class SeekSpeakCustomUI {
       return;
     }
     
-    // Check if captions are available
-    if (window.uiController && window.uiController.captionsAvailable) {
-      // Open search overlay directly
-      if (window.uiController.showSearchOverlay) {
-        window.uiController.showSearchOverlay();
-      } else {
-        // Fallback: trigger keyboard shortcut
-        document.dispatchEvent(new KeyboardEvent('keydown', {
-          key: 'F',
-          ctrlKey: true,
-          shiftKey: true
-        }));
-      }
+    // Open search interface
+    if (window.uiController && window.uiController.showSearchOverlay) {
+      window.uiController.showSearchOverlay();
     } else {
-      // Captions not loaded yet, show loading and fetch them
-      this.showLoadingOverlay("Loading captions for search...");
-      
-      // Trigger caption loading
-      if (window.captionFetcher && window.captionFetcher.init) {
-        const videoId = this.extractVideoId();
-        if (videoId) {
-          window.captionFetcher.init(videoId).then(() => {
-            this.hideLoadingOverlay();
-            // Open search after loading
-            setTimeout(() => {
-              if (window.uiController && window.uiController.showSearchOverlay) {
-                window.uiController.showSearchOverlay();
-              }
-            }, 500);
-          }).catch((error) => {
-            this.hideLoadingOverlay();
-            console.error('SeekSpeak: Error loading captions:', error);
-          });
-        }
-      }
+      // Fallback: trigger keyboard shortcut
+      document.dispatchEvent(new KeyboardEvent('keydown', {
+        key: 'F',
+        ctrlKey: true,
+        shiftKey: true
+      }));
     }
   }
 
@@ -327,34 +342,35 @@ class SeekSpeakCustomUI {
     return match ? match[1] : null;
   }
 
-  // Initialize custom UI
   init() {
-    console.log('SeekSpeak: Initializing custom UI components');
+    console.log('SeekSpeak: Initializing button UI');
     
-    // Add SeekSpeak button
-    this.addSeekSpeakButton();
+    // Create button
+    this.createButton();
     
-    // Re-add button on navigation
+    // Re-add button on navigation with proper cleanup
     document.addEventListener('yt-navigate-finish', () => {
-      setTimeout(() => this.addSeekSpeakButton(), 1000);
+      setTimeout(() => {
+        // Clean up old button
+        if (this.button && this.button.parentNode) {
+          this.button.remove();
+        }
+        this.button = null;
+        this.captionsReady = false;
+        this.isLoading = false;
+        
+        // Create new button
+        this.createButton();
+      }, 1000);
     });
   }
 
-  // Clean up
-  destroy() {
-    if (this.loadingOverlay) {
-      this.loadingOverlay.remove();
-    }
-    if (this.customButton) {
-      this.customButton.remove();
-    }
-    
-    const styles = document.getElementById('seekspeak-custom-ui-styles');
-    if (styles) {
-      styles.remove();
-    }
-  }
+  // Methods for compatibility with caption fetcher
+  showLoadingOverlay() { /* Removed - no more overlay */ }
+  updateLoadingProgress() { /* Removed - no more overlay */ }
+  hideLoadingOverlay() { /* Removed - no more overlay */ }
 }
 
-// Instantiate and attach to window for global access
+// Create global instance
 window.seekSpeakCustomUI = new SeekSpeakCustomUI();
+console.log('SeekSpeak: Button UI loaded');

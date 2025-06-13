@@ -61,13 +61,8 @@ class CaptionFetcher {
     
     console.log('SeekSpeak: No cached captions found for', videoId, '- fetching fresh captions');
     
-    // Show custom loading overlay instead of transcript flash
-    if (window.seekSpeakCustomUI) {
-      window.seekSpeakCustomUI.showLoadingOverlay("Extracting captions...");
-    }
-    
     try {
-      // Try multiple methods to get captions with custom loading updates
+      // Try multiple methods to get captions
       const methods = [
         {
           name: "YouTube Internal Data",
@@ -91,7 +86,7 @@ class CaptionFetcher {
         },
         {
           name: "Transcript Panel",
-          fn: () => this.tryTranscriptPanelAccessWithCustomUI(videoId)
+          fn: () => this.tryTranscriptPanelAccess(videoId)
         }
       ];
 
@@ -101,11 +96,6 @@ class CaptionFetcher {
         const method = methods[i];
         try {
           console.log('SeekSpeak: [DEBUG] Trying extraction method', i + 1, 'of', methods.length, ':', method.name);
-          
-          // Update loading progress
-          if (window.seekSpeakCustomUI) {
-            window.seekSpeakCustomUI.updateLoadingProgress(`Trying ${method.name}...`);
-          }
           
           const result = await method.fn();
           if (result && result.length > 0) {
@@ -118,10 +108,9 @@ class CaptionFetcher {
               source: method.name
             });
             
-            // Update success message
+            // Update button state if available
             if (window.seekSpeakCustomUI) {
-              window.seekSpeakCustomUI.updateLoadingProgress(`Successfully loaded ${result.length} segments!`);
-              setTimeout(() => window.seekSpeakCustomUI.hideLoadingOverlay(), 1000);
+              window.seekSpeakCustomUI.updateButtonState('ready');
             }
             
             return result;
@@ -135,15 +124,11 @@ class CaptionFetcher {
 
       // All methods failed - try fallback approach
       console.log('SeekSpeak: [DEBUG] All extraction methods failed, trying fallback...');
-      
-      if (window.seekSpeakCustomUI) {
-        window.seekSpeakCustomUI.updateLoadingProgress("Creating fallback captions...");
-      }
-      
       const fallback = await this.createFallbackCaptions(videoId);
       
+      // Update button state - fallback captions mean no real captions available
       if (window.seekSpeakCustomUI) {
-        setTimeout(() => window.seekSpeakCustomUI.hideLoadingOverlay(), 1500);
+        window.seekSpeakCustomUI.updateButtonState('disabled', 'No Captions');
       }
       
       return fallback;
@@ -151,8 +136,9 @@ class CaptionFetcher {
     } catch (error) {
       console.error('SeekSpeak: Error in fetchCaptions:', error);
       
+      // Update button state on error
       if (window.seekSpeakCustomUI) {
-        window.seekSpeakCustomUI.hideLoadingOverlay();
+        window.seekSpeakCustomUI.updateButtonState('disabled', 'No Captions');
       }
       
       return await this.createFallbackCaptions(videoId);
@@ -480,7 +466,6 @@ class CaptionFetcher {
         }
         
         let transcriptItems = [];
-        let style = null; // Style element for making panels invisible
         
         if (transcriptAlreadyOpen) {
           // Don't click button, just use existing content
@@ -488,65 +473,21 @@ class CaptionFetcher {
           transcriptItems = existingTranscriptItems;
         } else {
           // Transcript not open, we need to open it temporarily
-          // Enhanced transcript flash elimination - hide areas BEFORE clicking
-        console.log('SeekSpeak: [DEBUG] Pre-hiding all transcript areas to prevent flash');
-        
-        const ultimatePreventFlashStyle = document.createElement('style');
-        ultimatePreventFlashStyle.id = 'seekspeak-ultimate-prevent-flash';
-        ultimatePreventFlashStyle.textContent = `
-          /* ULTIMATE TRANSCRIPT FLASH PREVENTION - Applied BEFORE clicking */
-          #engagement-panel-searchable-transcript,
-          .ytd-engagement-panel-section-list-renderer,
-          ytd-engagement-panel-section-list-renderer,
-          [data-target-id="engagement-panel-searchable-transcript"],
-          tp-yt-paper-dialog,
-          #secondary-inner #panels ytd-engagement-panel-section-list-renderer,
-          #panels.ytd-watch-flexy ytd-engagement-panel-section-list-renderer,
-          #secondary #panels.ytd-watch-flexy,
-          #secondary #panels {
-            display: none !important;
-            opacity: 0 !important;
-            visibility: hidden !important;
-            position: fixed !important;
-            left: -99999px !important;
-            top: -99999px !important;
-            width: 1px !important;
-            height: 1px !important;
-            pointer-events: none !important;
-            z-index: -9999 !important;
-            transform: translateX(-100000px) translateY(-100000px) !important;
-            clip: rect(0 0 0 0) !important;
-            clip-path: inset(100%) !important;
-            overflow: hidden !important;
-          }
+          console.log('SeekSpeak: [DEBUG] Pre-hiding all transcript areas to prevent flash');
           
-          /* Prevent any engagement panels from affecting layout */
-          ytd-engagement-panel-section-list-renderer,
-          ytd-engagement-panel-section-list-renderer * {
-            display: none !important;
-            opacity: 0 !important;
-            visibility: hidden !important;
-          }
-        `;
-        
-        // Apply IMMEDIATELY before any button clicking
-        document.head.appendChild(ultimatePreventFlashStyle);
-        document.documentElement.classList.add('seekspeak-extraction-mode');
-        
-        console.log('SeekSpeak: [DEBUG] All transcript areas pre-hidden, now clicking button');
-          
-          // Prepare hiding styles but DON'T apply yet - let content load first
-          const preemptiveStyle = document.createElement('style');
-          preemptiveStyle.id = 'seekspeak-preemptive-hide';
-          preemptiveStyle.textContent = `
-            /* TRANSCRIPT HIDING - Applied after content loads */
+          const ultimatePreventFlashStyle = document.createElement('style');
+          ultimatePreventFlashStyle.id = 'seekspeak-ultimate-prevent-flash';
+          ultimatePreventFlashStyle.textContent = `
+            /* ULTIMATE TRANSCRIPT FLASH PREVENTION - Applied BEFORE clicking */
             #engagement-panel-searchable-transcript,
             .ytd-engagement-panel-section-list-renderer,
             ytd-engagement-panel-section-list-renderer,
             [data-target-id="engagement-panel-searchable-transcript"],
             tp-yt-paper-dialog,
             #secondary-inner #panels ytd-engagement-panel-section-list-renderer,
-            #panels.ytd-watch-flexy ytd-engagement-panel-section-list-renderer {
+            #panels.ytd-watch-flexy ytd-engagement-panel-section-list-renderer,
+            #secondary #panels.ytd-watch-flexy,
+            #secondary #panels {
               display: none !important;
               opacity: 0 !important;
               visibility: hidden !important;
@@ -562,7 +503,21 @@ class CaptionFetcher {
               clip-path: inset(100%) !important;
               overflow: hidden !important;
             }
+            
+            /* Prevent any engagement panels from affecting layout */
+            ytd-engagement-panel-section-list-renderer,
+            ytd-engagement-panel-section-list-renderer * {
+              display: none !important;
+              opacity: 0 !important;
+              visibility: hidden !important;
+            }
           `;
+          
+          // Apply IMMEDIATELY before any button clicking
+          document.head.appendChild(ultimatePreventFlashStyle);
+          document.documentElement.classList.add('seekspeak-extraction-mode');
+          
+          console.log('SeekSpeak: [DEBUG] All transcript areas pre-hidden, now clicking button');
           
           // Click the transcript button to open/load content
           transcriptButton.click();
@@ -571,13 +526,7 @@ class CaptionFetcher {
           console.log('SeekSpeak: [DEBUG] Waiting for transcript content to load before hiding...');
           await new Promise(resolve => setTimeout(resolve, 800)); // Allow content to load
           
-          // NOW apply hiding after content loads
-          console.log('SeekSpeak: [DEBUG] Applying hiding after content load');
-          document.documentElement.classList.add('seekspeak-extraction-mode');
-          document.head.appendChild(preemptiveStyle);
-        
-        // Wait for content to load with retry mechanism (only if we clicked the button)
-        if (!transcriptAlreadyOpen) {
+          // Wait for content to load with retry mechanism (only if we clicked the button)
           let retryCount = 0;
           const maxRetries = 3;
           
@@ -653,191 +602,85 @@ class CaptionFetcher {
             
             retryCount++;
             console.log('SeekSpeak: [DEBUG] Retry', retryCount, 'of', maxRetries, '- no transcript items found, trying again...');
-          } // End retry loop
-        } // End if (!transcriptAlreadyOpen) block
+          }
         
-        // If still no items after all attempts, do enhanced manual search
-        if (transcriptItems.length === 0) {
-          console.log('SeekSpeak: [DEBUG] No transcript items found, doing enhanced manual search');
-          
-          // First try: Look specifically in engagement panels for clickable elements with time patterns
-          const engagementPanels = document.querySelectorAll('#engagement-panel-searchable-transcript, .ytd-engagement-panel-section-list-renderer');
-          for (const panel of engagementPanels) {
-            const clickableInPanel = panel.querySelectorAll('button, [role="button"], [tabindex="0"], div[class*="segment"], [class*="transcript"]');
-            for (const element of clickableInPanel) {
-              const text = element.textContent || '';
-              // More specific timestamp patterns and better text validation
-              if (text.match(/\b\d{1,2}:\d{2}\b/) && text.length > 3 && text.length < 1000) {
-                // Check if it has additional transcript-like characteristics
-                if (text.includes(' ') || element.querySelector('[class*="time"]') || element.querySelector('[class*="text"]')) {
+          // If still no items after all attempts, do enhanced manual search
+          if (transcriptItems.length === 0) {
+            console.log('SeekSpeak: [DEBUG] No transcript items found, doing enhanced manual search');
+            
+            // First try: Look specifically in engagement panels for clickable elements with time patterns
+            const engagementPanels = document.querySelectorAll('#engagement-panel-searchable-transcript, .ytd-engagement-panel-section-list-renderer');
+            for (const panel of engagementPanels) {
+              const clickableInPanel = panel.querySelectorAll('button, [role="button"], [tabindex="0"], div[class*="segment"], [class*="transcript"]');
+              for (const element of clickableInPanel) {
+                const text = element.textContent || '';
+                // More specific timestamp patterns and better text validation
+                if (text.match(/\b\d{1,2}:\d{2}\b/) && text.length > 3 && text.length < 1000) {
+                  // Check if it has additional transcript-like characteristics
+                  if (text.includes(' ') || element.querySelector('[class*="time"]') || element.querySelector('[class*="text"]')) {
+                    transcriptItems.push(element);
+                  }
+                }
+              }
+            }
+            
+            // If still nothing, broader search with better filtering
+            if (transcriptItems.length === 0) {
+              const allClickable = document.querySelectorAll('button, [role="button"], [tabindex="0"]');
+              console.log('SeekSpeak: [DEBUG] Checking', allClickable.length, 'clickable elements for timestamps');
+              
+              for (const element of allClickable) {
+                const text = element.textContent || '';
+                // More precise timestamp detection and content validation
+                const hasTimestamp = text.match(/\b\d{1,2}:\d{2}\b/);
+                const hasWords = text.split(' ').length >= 2;
+                const reasonableLength = text.length > 5 && text.length < 800;
+                const notNavigation = !text.toLowerCase().match(/\b(next|previous|back|forward|home|menu|settings|profile)\b/);
+                
+                if (hasTimestamp && hasWords && reasonableLength && notNavigation) {
                   transcriptItems.push(element);
                 }
               }
             }
-          }
-          
-          // If still nothing, broader search with better filtering
-          if (transcriptItems.length === 0) {
-            const allClickable = document.querySelectorAll('button, [role="button"], [tabindex="0"]');
-            console.log('SeekSpeak: [DEBUG] Checking', allClickable.length, 'clickable elements for timestamps');
             
-            for (const element of allClickable) {
-              const text = element.textContent || '';
-              // More precise timestamp detection and content validation
-              const hasTimestamp = text.match(/\b\d{1,2}:\d{2}\b/);
-              const hasWords = text.split(' ').length >= 2;
-              const reasonableLength = text.length > 5 && text.length < 800;
-              const notNavigation = !text.toLowerCase().match(/\b(next|previous|back|forward|home|menu|settings|profile)\b/);
-              
-              if (hasTimestamp && hasWords && reasonableLength && notNavigation) {
-                transcriptItems.push(element);
-              }
-            }
+            console.log('SeekSpeak: [DEBUG] Enhanced search found', transcriptItems.length, 'items with timestamp patterns');
           }
-          
-          console.log('SeekSpeak: [DEBUG] Enhanced search found', transcriptItems.length, 'items with timestamp patterns');
         }
         
         if (transcriptItems.length > 0) {
           console.log('SeekSpeak: [DEBUG] Processing', transcriptItems.length, 'transcript segments');
+          const segments = this.extractSegmentsFromItems(transcriptItems);
           
-          const segments = [];
-          transcriptItems.forEach((item, index) => {
-            try {
-              // Enhanced text extraction - try multiple approaches
-              let timeElement = item.querySelector('.segment-timestamp') || 
-                              item.querySelector('[data-start-time]') ||
-                              item.querySelector('.cue-start-time') ||
-                              item.querySelector('[class*="time"]');
-              
-              let textElement = item.querySelector('.segment-text') || 
-                               item.querySelector('yt-formatted-string') ||
-                               item.querySelector('.cue-text') ||
-                               item.querySelector('[class*="text"]') ||
-                               item;
-              
-              let timeText = '';
-              let text = '';
-              
-              // Extract time
-              if (timeElement) {
-                timeText = timeElement.textContent?.trim() || timeElement.getAttribute('data-start-time') || '';
-              }
-              
-              // Extract text with better content detection
-              if (textElement) {
-                text = textElement.textContent?.trim() || '';
-              }
-              
-              // If we still don't have good content, try different extraction strategies
-              if (!text || text.length < 3) {
-                const fullText = item.textContent?.trim() || '';
-                
-                // Strategy 1: Split by timestamp pattern
-                const timeMatch = fullText.match(/^(\d+:[\d:]+)/);
-                if (timeMatch) {
-                  timeText = timeMatch[1];
-                  text = fullText.replace(timeMatch[0], '').trim();
-                } else {
-                  // Strategy 2: Look for timestamp anywhere and extract remaining text
-                  const timeInMiddle = fullText.match(/(\d+:[\d:]+)/);
-                  if (timeInMiddle) {
-                    timeText = timeInMiddle[1];
-                    text = fullText.replace(timeInMiddle[0], '').trim();
-                  } else {
-                    // Strategy 3: Use full text and estimate timing
-                    text = fullText;
-                    timeText = (index * 5).toString() + ':00'; // 5-second intervals as fallback
-                  }
-                }
-              }
-              
-              // Clean up text content
-              text = text.replace(/^\s*[-•·]\s*/, ''); // Remove bullet points
-              text = text.replace(/\s+/g, ' '); // Normalize whitespace
-              
-              if (text.length > 0 && text !== timeText) {
-                // Parse time more robustly
-                let startTime = 0;
-                if (timeText) {
-                  const timeParts = timeText.split(':').map(n => parseInt(n) || 0);
-                  if (timeParts.length === 2) {
-                    startTime = timeParts[0] * 60 + timeParts[1];
-                  } else if (timeParts.length === 3) {
-                    startTime = timeParts[0] * 3600 + timeParts[1] * 60 + timeParts[2];
-                  } else if (timeParts.length === 1) {
-                    startTime = timeParts[0];
-                  }
-                } else {
-                  startTime = index * 5; // Fallback: 5-second intervals
-                }
-                
-                segments.push({
-                  startTime: startTime,
-                  endTime: startTime + 3, // Approximate
-                  duration: 3,
-                  text: text
-                });
-                
-                console.log('SeekSpeak: [DEBUG] Extracted segment:', { startTime, text: text.slice(0, 50) });
-              }
-            } catch (err) {
-              console.warn('SeekSpeak: [DEBUG] Error processing transcript item:', err);
-            }
-          });
+          // Clean up hiding after successful extraction
+          console.log('SeekSpeak: [DEBUG] Cleaning up hiding after successful extraction');
+          document.documentElement.classList.remove('seekspeak-extraction-mode');
           
-          if (segments.length > 0) {
-            console.log('SeekSpeak: [DEBUG] Successfully extracted', segments.length, 'segments from transcript panel');
-            
-            // Clean up hiding after successful extraction
-            console.log('SeekSpeak: [DEBUG] Cleaning up hiding after successful extraction');
-            document.documentElement.classList.remove('seekspeak-extraction-mode');
-            const hideStyle = document.getElementById('seekspeak-preemptive-hide');
-            if (hideStyle) {
-              hideStyle.remove();
-            }
-            
-            if (transcriptAlreadyOpen) {
-              // User opened transcript manually - NEVER hide it
-              console.log('SeekSpeak: [DEBUG] Transcript was user-opened - leaving it completely visible');
-            } else {
-              // WE opened transcript for extraction - hide it again
-              console.log('SeekSpeak: [DEBUG] Closing transcript panel after extraction');
-              
-              // Remove the hiding style
-              const hideStyle = document.getElementById('seekspeak-preemptive-hide');
-              if (hideStyle) {
-                hideStyle.remove();
-              }
-              
-              // Try to close via button click
-              try {
-                const closeButton = document.querySelector('button[aria-label*="Close transcript"]') ||
-                                  document.querySelector('.ytd-engagement-panel-title-header-renderer button[aria-label*="Close"]') ||
-                                  document.querySelector('#engagement-panel-searchable-transcript button[aria-label*="Close"]');
-                
-                if (closeButton) {
-                  console.log('SeekSpeak: [DEBUG] Clicking close button');
-                  closeButton.click();
-                }
-              } catch (error) {
-                console.log('SeekSpeak: [DEBUG] Close button click failed:', error);
-              }
-            }
-            
-            return segments;
+          if (transcriptAlreadyOpen) {
+            // User opened transcript manually - NEVER hide it
+            console.log('SeekSpeak: [DEBUG] Transcript was user-opened - leaving it completely visible');
           } else {
-            // If no segments found, remove hiding style
-            console.log('SeekSpeak: [DEBUG] No segments found, removing hiding style');
-            const hideStyle = document.getElementById('seekspeak-preemptive-hide');
-            if (hideStyle) {
-              hideStyle.remove();
+            // WE opened transcript for extraction - hide it again
+            console.log('SeekSpeak: [DEBUG] Closing transcript panel after extraction');
+            
+            // Try to close via button click
+            try {
+              const closeButton = document.querySelector('button[aria-label*="Close transcript"]') ||
+                                document.querySelector('.ytd-engagement-panel-title-header-renderer button[aria-label*="Close"]') ||
+                                document.querySelector('#engagement-panel-searchable-transcript button[aria-label*="Close"]');
+              
+              if (closeButton) {
+                console.log('SeekSpeak: [DEBUG] Clicking close button');
+                closeButton.click();
+              }
+            } catch (error) {
+              console.log('SeekSpeak: [DEBUG] Close button click failed:', error);
             }
           }
+          
+          return segments;
         } else {
           console.log('SeekSpeak: [DEBUG] No transcript items found after clicking button');
         }
-        } // End of else block for "transcript not open"
       } else {
         console.log('SeekSpeak: [DEBUG] No transcript button found with any selector');
       }
@@ -850,12 +693,6 @@ class CaptionFetcher {
       
       // Remove extraction mode class
       document.documentElement.classList.remove('seekspeak-extraction-mode');
-      
-      // Remove hiding styles
-      const hideStyle = document.getElementById('seekspeak-preemptive-hide');
-      if (hideStyle) {
-        hideStyle.remove();
-      }
       
       // Remove ultimate flash prevention style
       const ultimateStyle = document.getElementById('seekspeak-ultimate-prevent-flash');
@@ -1054,200 +891,16 @@ class CaptionFetcher {
     return 0;
   }
 
-  // Fallback method for direct fetching if background script fails
-  async fetchDirectly(url) {
-    console.log('SeekSpeak: Attempting direct fetch as fallback');
-    
-    try {
-      // Try multiple approaches for fetching YouTube's authenticated URLs
-      const fetchOptions = [
-        // Approach 1: Minimal headers
-        {
-          method: 'GET',
-          headers: {
-            'Accept': '*/*',
-            'User-Agent': navigator.userAgent,
-            'Referer': window.location.href
-          },
-          credentials: 'include',
-          mode: 'cors'
-        },
-        // Approach 2: No credentials, basic headers
-        {
-          method: 'GET',
-          headers: {
-            'Accept': 'application/xml,text/xml,*/*',
-            'User-Agent': navigator.userAgent
-          },
-          mode: 'cors'
-        },
-        // Approach 3: Same-origin approach
-        {
-          method: 'GET',
-          headers: {
-            'Accept': '*/*'
-          },
-          credentials: 'same-origin'
-        }
-      ];
-
-      for (let i = 0; i < fetchOptions.length; i++) {
-        try {
-          console.log(`SeekSpeak: Trying direct fetch approach ${i + 1}`);
-          const response = await fetch(url, fetchOptions[i]);
-          
-          console.log(`SeekSpeak: Direct fetch approach ${i + 1} status:`, response.status);
-          
-          if (response.ok) {
-            const text = await response.text();
-            console.log(`SeekSpeak: Direct fetch approach ${i + 1} response length:`, text.length);
-            
-            if (text.length > 0) {
-              console.log('SeekSpeak: Direct fetch successful with approach', i + 1);
-              console.log('SeekSpeak: First 200 chars:', text.substring(0, 200));
-              
-              // Parse the response
-              if (text.includes('<timedtext') || text.includes('<text')) {
-                return this.parseXML(text);
-              } else if (text.includes('WEBVTT')) {
-                return this.parseVTT(text);
-              } else if (text.trim().startsWith('{')) {
-                return this.parseJSON(JSON.parse(text));
-              } else {
-                console.log('SeekSpeak: Unknown format from direct fetch, trying as plain text');
-                const lines = text.split('\n').filter(line => line.trim());
-                if (lines.length > 0) {
-                  return this.parseTextFormat(lines);
-                }
-              }
-            }
-          }
-        } catch (fetchError) {
-          console.log(`SeekSpeak: Direct fetch approach ${i + 1} failed:`, fetchError.message);
-        }
-      }
-    } catch (error) {
-      console.log('SeekSpeak: All direct fetch approaches failed:', error);
-    }
-    
-    return null;
-  }
-
-  // Check if video is likely to be blocked based on patterns
-  isVideoLikelyBlocked(videoId) {
-    // Rick Roll and other heavily accessed videos are often more protected
-    const knownBlockedPatterns = ['dQw4w9WgXcQ', 'vBhUyRNS-FY'];
-    return knownBlockedPatterns.includes(videoId);
-  }
-
-  // Alternative approach for blocked videos
-  async tryAlternativeApproach() {
-    console.log('SeekSpeak: Trying alternative caption extraction methods');
-    
-    // Try to find any caption data in the DOM without making requests
-    const alternatives = [
-      () => this.extractFromDOMCaptions(),
-      () => this.extractFromVideoDescription(),
-      () => this.createMockCaptions() // Last resort for testing
-    ];
-
-    for (const method of alternatives) {
-      try {
-        const result = await method();
-        if (result && result.length > 0) {
-          console.log('SeekSpeak: Alternative method succeeded');
-          return result;
-        }
-      } catch (error) {
-        console.log('SeekSpeak: Alternative method failed:', error.message);
-      }
-    }
-
-    return null;
-  }
-
-  // Extract any visible caption data from DOM
-  extractFromDOMCaptions() {
-    console.log('SeekSpeak: Trying to extract captions from DOM');
-    
-    // Look for any visible caption text in YouTube's player
-    const captionSelectors = [
-      '.ytp-caption-segment',
-      '.caption-window',
-      '.ytp-caption-window-container',
-      '.html5-captions-text'
-    ];
-
-    for (const selector of captionSelectors) {
-      const elements = document.querySelectorAll(selector);
-      if (elements.length > 0) {
-        console.log('SeekSpeak: Found caption elements in DOM:', elements.length);
-        // This would need real-time monitoring, not suitable for our use case
-      }
-    }
-
-    return null;
-  }
-
-  // Extract from video description (sometimes has transcript)
-  extractFromVideoDescription() {
-    console.log('SeekSpeak: Checking video description for transcript');
-    
-    const descriptionSelectors = [
-      '#description-text',
-      '.ytd-expandable-video-description-body-renderer',
-      '.content.ytd-video-secondary-info-renderer'
-    ];
-
-    for (const selector of descriptionSelectors) {
-      const desc = document.querySelector(selector);
-      if (desc && desc.textContent) {
-        const text = desc.textContent;
-        // Look for transcript-like patterns
-        if (text.includes('transcript') || text.includes('captions') || 
-            text.includes('00:') || text.match(/\d+:\d+/)) {
-          console.log('SeekSpeak: Found potential transcript in description');
-          // This would need more sophisticated parsing
-        }
-      }
-    }
-
-    return null;
-  }
-
-  // Create mock captions for testing (when real captions fail)
-  createMockCaptions() {
-    console.log('SeekSpeak: Creating mock captions for testing purposes');
+  // Create fallback captions for testing (when real captions fail)
+  async createFallbackCaptions(videoId) {
+    console.log('SeekSpeak: Creating fallback captions for testing purposes');
     
     return [
-      { startTime: 0, endTime: 5, text: "This video appears to be protected from automated caption access." },
-      { startTime: 5, endTime: 10, text: "SeekSpeak is unable to fetch captions due to YouTube's anti-bot protection." },
-      { startTime: 10, endTime: 15, text: "Try testing with a different video that may have less protection." },
-      { startTime: 15, endTime: 20, text: "Consider using videos with manual captions rather than auto-generated ones." }
+      { startTime: 0, endTime: 5, duration: 5, text: "This video appears to be protected from automated caption access." },
+      { startTime: 5, endTime: 10, duration: 5, text: "SeekSpeak is unable to fetch captions due to YouTube's anti-bot protection." },
+      { startTime: 10, endTime: 15, duration: 5, text: "Try testing with a different video that may have less protection." },
+      { startTime: 15, endTime: 20, duration: 5, text: "Consider using videos with manual captions rather than auto-generated ones." }
     ];
-  }
-
-  // Parse simple text format (fallback)
-  parseTextFormat(lines) {
-    console.log('SeekSpeak: Parsing as simple text format');
-    
-    const segments = [];
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i].trim();
-      if (line) {
-        // Simple fallback: assume each line is roughly 3 seconds
-        const startTime = i * 3;
-        const endTime = (i + 1) * 3;
-        
-        segments.push({
-          startTime: startTime,
-          endTime: endTime,
-          text: line
-        });
-      }
-    }
-    
-    return segments;
   }
 
   async fetchFromPlayerData(videoId) {
@@ -1262,68 +915,15 @@ class CaptionFetcher {
         const captionInfo = this.parsePlayerCaptions(playerData.captions);
         
         if (captionInfo && captionInfo.type === 'url') {
-          // Check if this video might not have captions or is heavily protected
-          if (this.isVideoLikelyBlocked(this.currentVideoId)) {
-            console.log('SeekSpeak: Video appears to be protected/blocked, trying alternative approach');
-            return await this.tryAlternativeApproach();
-          }
-
-          console.log('SeekSpeak: Fetching captions from player data URL via background script:', captionInfo.url);
+          console.log('SeekSpeak: Found English caption track');
+          console.log('SeekSpeak: Caption URL:', captionInfo.url);
           
-          try {
-            // Use background script to fetch the URL (better permissions)
-            console.log('SeekSpeak: Sending message to background script');
-            const result = await chrome.runtime.sendMessage({
-              type: 'FETCH_CAPTION_URL',
-              url: captionInfo.url,
-              videoId: this.currentVideoId
-            });
-
-            console.log('SeekSpeak: Background script result:', result);
-
-            // Check if we got a valid response
-            if (!result) {
-              console.log('SeekSpeak: Background script returned undefined, falling back to direct fetch');
-              return await this.fetchDirectly(captionInfo.url);
-            }
-
-            if (result.success && result.data && result.data.length > 0) {
-              console.log('SeekSpeak: Successfully got captions via background script');
-              console.log('SeekSpeak: Content-Type:', result.contentType);
-              console.log('SeekSpeak: Data length:', result.length);
-              console.log('SeekSpeak: First 200 chars:', result.data.substring(0, 200));
-
-              // Determine format and parse accordingly
-              if (result.data.includes('<timedtext') || result.data.includes('<text')) {
-                console.log('SeekSpeak: Parsing background data as XML');
-                return this.parseXML(result.data);
-              } else if (result.data.includes('WEBVTT')) {
-                console.log('SeekSpeak: Parsing background data as VTT');
-                return this.parseVTT(result.data);
-              } else if (result.data.trim().startsWith('{') || result.data.trim().startsWith('[')) {
-                try {
-                  console.log('SeekSpeak: Parsing background data as JSON');
-                  return this.parseJSON(JSON.parse(result.data));
-                } catch (jsonError) {
-                  console.warn('SeekSpeak: Failed to parse background data as JSON:', jsonError);
-                }
-              } else {
-                console.log('SeekSpeak: Trying to parse background data as plain text');
-                const lines = result.data.split('\n').filter(line => line.trim());
-                if (lines.length > 0) {
-                  return this.parseTextFormat(lines);
-                }
-              }
-            } else {
-              console.log('SeekSpeak: Background script failed or returned empty data:', result.error || 'Unknown error');
-              
-              // Fallback: try direct fetch if background script fails
-              console.log('SeekSpeak: Falling back to direct content script fetch');
-              return await this.fetchDirectly(captionInfo.url);
-            }
-          } catch (fetchError) {
-            console.warn('SeekSpeak: Failed to fetch from player data URL:', fetchError);
-          }
+          // Return the caption URL so we can fetch it
+          return {
+            type: 'url',
+            url: captionInfo.url,
+            language: captionInfo.language
+          };
         }
       }
     } catch (error) {
@@ -1432,51 +1032,7 @@ class CaptionFetcher {
           console.log('SeekSpeak: Found', transcriptItems.length, 'transcript items with selector:', itemSelector);
           
           if (transcriptItems.length > 0) {
-            for (const item of transcriptItems) {
-              let startTime = 0;
-              let text = '';
-              
-              // Try to extract start time
-              if (item.dataset.startTime) {
-                startTime = parseInt(item.dataset.startTime);
-              } else if (item.dataset.offset) {
-                startTime = parseInt(item.dataset.offset);
-              }
-              
-              // Try to extract text
-              const textSelectors = [
-                '.segment-text',
-                '.ytd-transcript-segment-renderer',
-                '.transcript-text',
-                '.cue-text'
-              ];
-              
-              for (const textSelector of textSelectors) {
-                const textElement = item.querySelector(textSelector);
-                if (textElement) {
-                  text = textElement.textContent.trim();
-                  break;
-                }
-              }
-              
-              if (!text) {
-                text = item.textContent.trim();
-              }
-              
-              if (text && startTime >= 0) {
-                segments.push({
-                  startTime,
-                  duration: 3,
-                  endTime: startTime + 3,
-                  text: this.cleanText(text)
-                });
-              }
-            }
-            
-            if (segments.length > 0) {
-              console.log('SeekSpeak: Successfully parsed', segments.length, 'segments from transcript panel');
-              return segments;
-            }
+            return this.extractSegmentsFromItems(Array.from(transcriptItems));
           }
         }
       }
@@ -1505,70 +1061,6 @@ class CaptionFetcher {
           if (captions && captions.length > 0) {
             console.log('SeekSpeak: Found captions in', source);
             return captions;
-          }
-        }
-      }
-      
-      // Look for data in script tags
-      const scriptTags = document.querySelectorAll('script');
-      for (const script of scriptTags) {
-        if (script.textContent.includes('captionTracks') || 
-            script.textContent.includes('timedTextTrack')) {
-          console.log('SeekSpeak: Found potential caption data in script tag');
-          try {
-            // Try to extract and parse caption URLs from script content
-            const captionUrls = this.extractCaptionUrlsFromScript(script.textContent);
-            if (captionUrls.length > 0) {
-              console.log('SeekSpeak: Found', captionUrls.length, 'caption URLs in script');
-              
-              // Try to fetch captions from the first working URL
-              for (const url of captionUrls) {
-                // Decode escaped ampersands
-                const decodedUrl = url.replace(/\\u0026/g, '&');
-                console.log('SeekSpeak: Trying to fetch from script URL via background script:', decodedUrl);
-                
-                try {
-                  // Use background script for better permissions
-                  console.log('SeekSpeak: Sending script URL to background script');
-                  const result = await chrome.runtime.sendMessage({
-                    type: 'FETCH_CAPTION_URL',
-                    url: decodedUrl,
-                    videoId: this.currentVideoId || videoId
-                  });
-
-                  console.log('SeekSpeak: Background script result for script URL:', result);
-
-                  // Check if we got a valid response
-                  if (!result) {
-                    console.log('SeekSpeak: Background script returned undefined for script URL, trying direct fetch');
-                    const directResult = await this.fetchDirectly(decodedUrl);
-                    if (directResult) return directResult;
-                    continue; // Try next URL
-                  }
-
-                  if (result.success && result.data && result.data.length > 0) {
-                    console.log('SeekSpeak: Successfully fetched script URL via background');
-                    
-                    // Determine format and parse accordingly
-                    if (result.data.includes('<timedtext') || result.data.includes('<text')) {
-                      return this.parseXML(result.data);
-                    } else if (result.data.includes('WEBVTT')) {
-                      return this.parseVTT(result.data);
-                    } else if (result.data.trim().startsWith('{')) {
-                      return this.parseJSON(JSON.parse(result.data));
-                    }
-                  } else {
-                    console.log('SeekSpeak: Background script failed for script URL, trying direct fetch');
-                    const directResult = await this.fetchDirectly(decodedUrl);
-                    if (directResult) return directResult;
-                  }
-                } catch (fetchError) {
-                  console.warn('SeekSpeak: Failed to fetch from script URL:', fetchError);
-                }
-              }
-            }
-          } catch (error) {
-            // Ignore parsing errors
           }
         }
       }
@@ -1618,16 +1110,6 @@ class CaptionFetcher {
     // This would process timed text runs if found
     console.log('SeekSpeak: Processing timed text runs:', runs.length);
     return null; // Placeholder for now
-  }
-  
-  extractCaptionUrlsFromScript(scriptContent) {
-    const urls = [];
-    const urlPattern = /https:\/\/www\.youtube\.com\/api\/timedtext[^"'\s]+/g;
-    const matches = scriptContent.match(urlPattern);
-    if (matches) {
-      urls.push(...matches);
-    }
-    return urls;
   }
 
   processCaptionData(rawSegments) {
@@ -1700,86 +1182,5 @@ class CaptionFetcher {
 }
 
 // Instantiate and attach to window for global access
-window.captionFetcher = new CaptionFetcher();  // NEW: Transcript panel access with custom UI (no flash)
-  async tryTranscriptPanelAccessWithCustomUI(videoId) {
-    console.log('SeekSpeak: Accessing transcript panel with custom UI');
-    
-    try {
-      // Find transcript button
-      const transcriptButton = await this.findTranscriptButton();
-      if (!transcriptButton) {
-        return null;
-      }
-
-      // Update loading progress - custom UI already showing
-      if (window.seekSpeakCustomUI) {
-        window.seekSpeakCustomUI.updateLoadingProgress("Opening transcript panel...");
-      }
-      
-      // Click transcript button - let it show, our custom overlay covers it
-      transcriptButton.click();
-      
-      // Wait for content to load
-      if (window.seekSpeakCustomUI) {
-        window.seekSpeakCustomUI.updateLoadingProgress("Loading transcript content...");
-      }
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      // Extract content from now-visible transcript
-      const segments = await this.extractTranscriptSegments();
-      
-      // Close transcript panel
-      const closeButton = document.querySelector('button[aria-label*="Close transcript"]');
-      if (closeButton) {
-        closeButton.click();
-      }
-      
-      return segments;
-      
-    } catch (error) {
-      console.error('SeekSpeak: Error in custom UI transcript panel access:', error);
-      return null;
-    }
-  }
-
-  // Helper method to find transcript button
-  async findTranscriptButton() {
-    const selectors = [
-      'button[aria-label*="Show transcript"]',
-      'button[aria-label*="transcript" i]',
-      'ytd-button-renderer button[aria-label*="transcript" i]'
-    ];
-    
-    for (const selector of selectors) {
-      const button = document.querySelector(selector);
-      if (button) return button;
-    }
-    
-    // Wait and try again
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
-    for (const selector of selectors) {
-      const button = document.querySelector(selector);
-      if (button) return button;
-    }
-    
-    return null;
-  }
-
-  // Extract segments from visible transcript
-  async extractTranscriptSegments() {
-    const selectors = [
-      'ytd-transcript-segment-renderer',
-      '[data-start-time]',
-      'button[data-start-time]'
-    ];
-    
-    for (const selector of selectors) {
-      const elements = document.querySelectorAll(selector);
-      if (elements.length > 0) {
-        return this.extractSegmentsFromItems(Array.from(elements));
-      }
-    }
-    
-    return null;
-  }
+window.captionFetcher = new CaptionFetcher();
+console.log('SeekSpeak: CaptionFetcher loaded successfully');
