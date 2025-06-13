@@ -23,6 +23,7 @@
         "https://youtube.com/watch*"
       ],
       "js": [
+        "content/custom-ui.js",
         "content/caption-fetcher.js",
         "content/search-engine.js", 
         "content/ui-controller.js",

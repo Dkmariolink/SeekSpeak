@@ -404,13 +404,15 @@ function initializeSeekSpeak() {
     // Verify all components are loaded
     const componentsLoaded = window.captionFetcher && 
                            window.searchEngine && 
-                           window.uiController;
+                           window.uiController &&
+                           window.seekSpeakCustomUI;
     
     if (!componentsLoaded) {
       console.log('SeekSpeak: Components not all loaded yet, will retry');
       console.log('SeekSpeak: captionFetcher:', !!window.captionFetcher);
       console.log('SeekSpeak: searchEngine:', !!window.searchEngine);  
       console.log('SeekSpeak: uiController:', !!window.uiController);
+      console.log('SeekSpeak: seekSpeakCustomUI:', !!window.seekSpeakCustomUI);
       
       // Retry in 1 second
       setTimeout(() => {
@@ -423,6 +425,13 @@ function initializeSeekSpeak() {
     }
     
     console.log('SeekSpeak: All components loaded, creating YouTubeInjector');
+    
+    // Initialize custom UI first
+    if (window.seekSpeakCustomUI && window.seekSpeakCustomUI.init) {
+      window.seekSpeakCustomUI.init();
+      console.log('SeekSpeak: Custom UI initialized successfully');
+    }
+    
     window.seekSpeakInjector = new YouTubeInjector();
     console.log('SeekSpeak: YouTubeInjector created successfully');
     

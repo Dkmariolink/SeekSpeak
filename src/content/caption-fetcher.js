@@ -50,32 +50,113 @@ class CaptionFetcher {
   }
 
   async fetchCaptions(videoId) {
-    // Try multiple methods to get captions - PRIORITIZE INVISIBLE APPROACHES
-    const methods = [
-      () => this.extractFromYouTubeInternals(videoId), // PRIMARY: Internal player data (invisible)
-      () => this.extractFromPageData(videoId),         // SECONDARY: Page data scraping (invisible)
-      () => this.fetchFromPlayerData(videoId),        // TERTIARY: Player data extraction (invisible)
-      () => this.parseFromTranscriptPanel(),          // QUATERNARY: Parse existing transcript (invisible)
-      () => this.fetchFromTimedTextAPI(videoId),      // QUINARY: API (often blocked, invisible)
-      () => this.tryTranscriptPanelAccess(videoId),  // LAST RESORT: Transcript button (visible but hidden)
-    ];
-
-    console.log('SeekSpeak: [DEBUG] fetchCaptions methods array length:', methods.length);
-    console.log('SeekSpeak: [DEBUG] extractFromYouTubeInternals method exists:', typeof this.extractFromYouTubeInternals);
-
-    for (const method of methods) {
-      try {
-        console.log('SeekSpeak: [DEBUG] Calling method:', method.toString().slice(0, 50));
-        const result = await method();
-        if (result) {
-          return result;
-        }
-      } catch (error) {
-        console.warn('SeekSpeak: Caption fetch method failed:', error.message);
-      }
+    console.log('SeekSpeak: Starting fetchCaptions for', videoId);
+    
+    // Check for cached captions first
+    const cached = await this.getCachedCaptions(videoId);
+    if (cached && cached.segments && cached.segments.length > 0) {
+      console.log('SeekSpeak: Using cached captions for', videoId, ':', cached.segments.length, 'segments');
+      return cached.segments;
     }
+    
+    console.log('SeekSpeak: No cached captions found for', videoId, '- fetching fresh captions');
+    
+    // Show custom loading overlay instead of transcript flash
+    if (window.seekSpeakCustomUI) {
+      window.seekSpeakCustomUI.showLoadingOverlay("Extracting captions...");
+    }
+    
+    try {
+      // Try multiple methods to get captions with custom loading updates
+      const methods = [
+        {
+          name: "YouTube Internal Data",
+          fn: () => this.extractFromYouTubeInternals(videoId)
+        },
+        {
+          name: "Page Data Scraping",
+          fn: () => this.extractFromPageData(videoId)
+        },
+        {
+          name: "Player Data",
+          fn: () => this.fetchFromPlayerData(videoId)
+        },
+        {
+          name: "Existing Transcript",
+          fn: () => this.parseFromTranscriptPanel()
+        },
+        {
+          name: "TimedText API",
+          fn: () => this.fetchFromTimedTextAPI(videoId)
+        },
+        {
+          name: "Transcript Panel",
+          fn: () => this.tryTranscriptPanelAccessWithCustomUI(videoId)
+        }
+      ];
 
-    return null;
+      console.log('SeekSpeak: [DEBUG] fetchCaptions methods array length:', methods.length);
+
+      for (let i = 0; i < methods.length; i++) {
+        const method = methods[i];
+        try {
+          console.log('SeekSpeak: [DEBUG] Trying extraction method', i + 1, 'of', methods.length, ':', method.name);
+          
+          // Update loading progress
+          if (window.seekSpeakCustomUI) {
+            window.seekSpeakCustomUI.updateLoadingProgress(`Trying ${method.name}...`);
+          }
+          
+          const result = await method.fn();
+          if (result && result.length > 0) {
+            console.log('SeekSpeak: [DEBUG] Successfully extracted', result.length, 'segments using', method.name);
+            
+            // Cache the successful result
+            await this.cacheCaption(videoId, {
+              segments: result,
+              processedAt: Date.now(),
+              source: method.name
+            });
+            
+            // Update success message
+            if (window.seekSpeakCustomUI) {
+              window.seekSpeakCustomUI.updateLoadingProgress(`Successfully loaded ${result.length} segments!`);
+              setTimeout(() => window.seekSpeakCustomUI.hideLoadingOverlay(), 1000);
+            }
+            
+            return result;
+          } else {
+            console.log('SeekSpeak: [DEBUG] Method', method.name, 'returned no results');
+          }
+        } catch (error) {
+          console.warn('SeekSpeak: Caption fetch method', method.name, 'failed:', error.message);
+        }
+      }
+
+      // All methods failed - try fallback approach
+      console.log('SeekSpeak: [DEBUG] All extraction methods failed, trying fallback...');
+      
+      if (window.seekSpeakCustomUI) {
+        window.seekSpeakCustomUI.updateLoadingProgress("Creating fallback captions...");
+      }
+      
+      const fallback = await this.createFallbackCaptions(videoId);
+      
+      if (window.seekSpeakCustomUI) {
+        setTimeout(() => window.seekSpeakCustomUI.hideLoadingOverlay(), 1500);
+      }
+      
+      return fallback;
+      
+    } catch (error) {
+      console.error('SeekSpeak: Error in fetchCaptions:', error);
+      
+      if (window.seekSpeakCustomUI) {
+        window.seekSpeakCustomUI.hideLoadingOverlay();
+      }
+      
+      return await this.createFallbackCaptions(videoId);
+    }
   }
 
   async fetchFromTimedTextAPI(videoId) {
@@ -1567,4 +1648,86 @@ class CaptionFetcher {
 }
 
 // Instantiate and attach to window for global access
-window.captionFetcher = new CaptionFetcher();
+window.captionFetcher = new CaptionFetcher();  // NEW: Transcript panel access with custom UI (no flash)
+  async tryTranscriptPanelAccessWithCustomUI(videoId) {
+    console.log('SeekSpeak: Accessing transcript panel with custom UI');
+    
+    try {
+      // Find transcript button
+      const transcriptButton = await this.findTranscriptButton();
+      if (!transcriptButton) {
+        return null;
+      }
+
+      // Update loading progress - custom UI already showing
+      if (window.seekSpeakCustomUI) {
+        window.seekSpeakCustomUI.updateLoadingProgress("Opening transcript panel...");
+      }
+      
+      // Click transcript button - let it show, our custom overlay covers it
+      transcriptButton.click();
+      
+      // Wait for content to load
+      if (window.seekSpeakCustomUI) {
+        window.seekSpeakCustomUI.updateLoadingProgress("Loading transcript content...");
+      }
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      
+      // Extract content from now-visible transcript
+      const segments = await this.extractTranscriptSegments();
+      
+      // Close transcript panel
+      const closeButton = document.querySelector('button[aria-label*="Close transcript"]');
+      if (closeButton) {
+        closeButton.click();
+      }
+      
+      return segments;
+      
+    } catch (error) {
+      console.error('SeekSpeak: Error in custom UI transcript panel access:', error);
+      return null;
+    }
+  }
+
+  // Helper method to find transcript button
+  async findTranscriptButton() {
+    const selectors = [
+      'button[aria-label*="Show transcript"]',
+      'button[aria-label*="transcript" i]',
+      'ytd-button-renderer button[aria-label*="transcript" i]'
+    ];
+    
+    for (const selector of selectors) {
+      const button = document.querySelector(selector);
+      if (button) return button;
+    }
+    
+    // Wait and try again
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    
+    for (const selector of selectors) {
+      const button = document.querySelector(selector);
+      if (button) return button;
+    }
+    
+    return null;
+  }
+
+  // Extract segments from visible transcript
+  async extractTranscriptSegments() {
+    const selectors = [
+      'ytd-transcript-segment-renderer',
+      '[data-start-time]',
+      'button[data-start-time]'
+    ];
+    
+    for (const selector of selectors) {
+      const elements = document.querySelectorAll(selector);
+      if (elements.length > 0) {
+        return this.extractSegmentsFromItems(Array.from(elements));
+      }
+    }
+    
+    return null;
+  }
