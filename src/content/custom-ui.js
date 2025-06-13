@@ -92,9 +92,11 @@ class SeekSpeakCustomUI {
         }
       }
 
-      /* Loading dots animation */
+      /* Loading dots animation - prevent layout shift */
       .seekspeak-loading-dots {
         display: inline-block;
+        min-width: 18px; /* Space for "..." */
+        text-align: left;
       }
 
       .seekspeak-loading-dots::after {
@@ -291,7 +293,7 @@ class SeekSpeakCustomUI {
         textSpan.innerHTML = 'Search Captions';
         this.isLoading = false;
         this.captionsReady = true;
-        this.button.title = 'Search video captions with SeekSpeak (click again to close)';
+        this.button.title = 'Search video captions with SeekSpeak';
         break;
         
       case 'disabled':
