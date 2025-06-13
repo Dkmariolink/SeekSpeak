@@ -32,7 +32,7 @@
       "css": [
         "content/seekspeak.css"
       ],
-      "run_at": "document_idle",
+      "run_at": "document_start",
       "all_frames": false
     }
   ],
@@ -59,6 +59,8 @@
     "128": "assets/icons/icon128.png"
   },
   
+  "options_page": "options/options.html",
+
   "commands": {
     "open-search": {
       "suggested_key": {

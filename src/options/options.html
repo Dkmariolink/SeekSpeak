@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SeekSpeak Options</title>
+  <link rel="stylesheet" href="options.css">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="header-content">
+        <img src="../assets/icons/icon48.png" alt="SeekSpeak" class="logo">
+        <h1>SeekSpeak Settings</h1>
+      </div>
+    </header>
+
+    <main>
+      <section class="setting-section">
+        <h2>Caption Caching</h2>
+        <p class="description">
+          Control when SeekSpeak automatically caches video captions for faster future searches.
+        </p>
+        
+        <div class="setting-group">
+          <label class="setting-item">
+            <input type="radio" name="caching-mode" value="always" id="cache-always">
+            <span class="radio"></span>
+            <div class="setting-details">
+              <strong>Always cache captions</strong>
+              <small>Cache captions for all videos (default)</small>
+            </div>
+          </label>
+
+          <label class="setting-item">
+            <input type="radio" name="caching-mode" value="length-based" id="cache-length">
+            <span class="radio"></span>
+            <div class="setting-details">
+              <strong>Cache based on video length</strong>
+              <small>Only cache captions for videos longer than specified duration</small>
+            </div>
+          </label>
+
+          <label class="setting-item">
+            <input type="radio" name="caching-mode" value="never" id="cache-never">
+            <span class="radio"></span>
+            <div class="setting-details">
+              <strong>Never cache captions</strong>
+              <small>Always fetch captions fresh (slower but uses no storage)</small>
+            </div>
+          </label>
+        </div>
+
+        <div class="length-setting" id="length-setting" style="display: none;">
+          <label for="min-length">Minimum video length to cache:</label>
+          <div class="length-input">
+            <input type="number" id="min-length" min="1" max="1440" value="10">
+            <span>minutes</span>
+          </div>
+          <small>Videos shorter than this will not have captions cached</small>
+        </div>
+      </section>
+
+      <section class="setting-section">
+        <h2>Storage Management</h2>
+        <p class="description">
+          Manage cached caption data.
+        </p>
+        
+        <div class="storage-info">
+          <div class="storage-item">
+            <strong>Cached videos:</strong>
+            <span id="cached-count">Loading...</span>
+          </div>
+          <div class="storage-item">
+            <strong>Storage used:</strong>
+            <span id="storage-used">Loading...</span>
+          </div>
+        </div>
+        
+        <button id="clear-cache" class="btn btn-secondary">
+          Clear All Cached Captions
+        </button>
+      </section>
+    </main>
+
+    <footer>
+      <div class="footer-actions">
+        <button id="save-settings" class="btn btn-primary">
+          Save Settings
+        </button>
+        <button id="reset-settings" class="btn btn-secondary">
+          Reset to Defaults
+        </button>
+      </div>
+      
+      <div class="footer-info">
+        <p>
+          SeekSpeak v1.0.0 | 
+          <a href="https://github.com/Dkmariolink/SeekSpeak" target="_blank">GitHub</a> | 
+          <a href="https://buymeacoffee.com/dkmariolink" target="_blank">☕ Support</a>
+        </p>
+      </div>
+    </footer>
+  </div>
+
+  <div id="toast" class="toast" style="display: none;">
+    <span id="toast-message"></span>
+  </div>
+
+  <script src="options.js"></script>
+</body>
+</html>

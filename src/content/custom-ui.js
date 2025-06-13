@@ -7,6 +7,7 @@ class SeekSpeakCustomUI {
     this.button = null;
     this.captionsReady = false;
     this.isLoading = false;
+    this.checkInterval = null; // For periodic caption checking
     this.injectStyles();
   }
 
@@ -204,25 +205,13 @@ class SeekSpeakCustomUI {
   checkExistingCaptions() {
     console.log('SeekSpeak: Checking for existing captions');
     
-    // Check if search engine has captions ready
-    if (window.searchEngine && window.searchEngine.isReady && window.searchEngine.isReady()) {
-      console.log('SeekSpeak: Found existing captions, updating button to ready state');
-      this.updateButtonState('ready');
-      return;
-    }
-    
-    // Check if UI controller has captions available
-    if (window.uiController && window.uiController.captionsAvailable) {
-      console.log('SeekSpeak: UI Controller reports captions available');
-      this.updateButtonState('ready');
-      return;
-    }
-    
-    // Check if caption fetcher has cached data
-    if (window.captionFetcher && window.captionFetcher.getCurrentCaptions) {
-      const captions = window.captionFetcher.getCurrentCaptions();
-      if (captions && captions.length > 0) {
-        console.log('SeekSpeak: Found cached captions');
+    // Use the same logic as the popup for accuracy
+    if (window.uiController && typeof window.uiController.getCaptionStatus === 'function') {
+      const status = window.uiController.getCaptionStatus();
+      console.log('SeekSpeak: Caption status from UI controller:', status);
+      
+      if (status && status.available && status.segmentCount > 0) {
+        console.log('SeekSpeak: Found existing captions, updating button to ready state');
         this.updateButtonState('ready');
         return;
       }
@@ -242,6 +231,22 @@ class SeekSpeakCustomUI {
 
     this.updateButtonState('loading');
     
+    // Set up periodic checking for when captions become available
+    this.checkInterval = setInterval(() => {
+      this.checkCaptionReadiness();
+    }, 1000); // Check every second
+    
+    // Stop checking after 30 seconds
+    setTimeout(() => {
+      if (this.checkInterval) {
+        clearInterval(this.checkInterval);
+        this.checkInterval = null;
+        if (this.isLoading) {
+          this.updateButtonState('disabled', 'No Captions');
+        }
+      }
+    }, 30000);
+    
     // Try to trigger caption loading
     if (window.captionFetcher && window.captionFetcher.init) {
       const videoId = this.extractVideoId();
@@ -249,7 +254,12 @@ class SeekSpeakCustomUI {
         console.log('SeekSpeak: Starting caption fetch for video:', videoId);
         
         window.captionFetcher.init(videoId).then((result) => {
-          if (result && result.segments && result.segments.length > 0) {
+          if (this.checkInterval) {
+            clearInterval(this.checkInterval);
+            this.checkInterval = null;
+          }
+          
+          if (result && result.segments && result.segments.length > 4) { // Real captions
             console.log('SeekSpeak: Captions loaded successfully');
             this.updateButtonState('ready');
           } else {
@@ -257,6 +267,10 @@ class SeekSpeakCustomUI {
             this.updateButtonState('disabled', 'No Captions');
           }
         }).catch((error) => {
+          if (this.checkInterval) {
+            clearInterval(this.checkInterval);
+            this.checkInterval = null;
+          }
           console.error('SeekSpeak: Error loading captions:', error);
           this.updateButtonState('disabled', 'No Captions');
         });
@@ -267,6 +281,24 @@ class SeekSpeakCustomUI {
     } else {
       console.error('SeekSpeak: CaptionFetcher not available');
       this.updateButtonState('disabled', 'No Captions');
+    }
+  }
+
+  // Check if captions have become ready (called periodically during loading)
+  checkCaptionReadiness() {
+    if (!this.isLoading) return;
+    
+    if (window.uiController && typeof window.uiController.getCaptionStatus === 'function') {
+      const status = window.uiController.getCaptionStatus();
+      
+      if (status && status.available && status.segmentCount > 4) { // Real captions
+        console.log('SeekSpeak: Captions became ready during loading check');
+        if (this.checkInterval) {
+          clearInterval(this.checkInterval);
+          this.checkInterval = null;
+        }
+        this.updateButtonState('ready');
+      }
     }
   }
 
@@ -353,7 +385,11 @@ class SeekSpeakCustomUI {
     // Re-add button on navigation with proper cleanup
     document.addEventListener('yt-navigate-finish', () => {
       setTimeout(() => {
-        // Clean up old button
+        // Clean up old button and intervals
+        if (this.checkInterval) {
+          clearInterval(this.checkInterval);
+          this.checkInterval = null;
+        }
         if (this.button && this.button.parentNode) {
           this.button.remove();
         }

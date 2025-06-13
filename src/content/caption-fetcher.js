@@ -108,8 +108,8 @@ class CaptionFetcher {
               source: method.name
             });
             
-            // Update button state if available
-            if (window.seekSpeakCustomUI) {
+            // Update button state if available - but only for real captions
+            if (window.seekSpeakCustomUI && result.length > 4) { // More than fallback captions
               window.seekSpeakCustomUI.updateButtonState('ready');
             }
             
@@ -1164,12 +1164,77 @@ class CaptionFetcher {
 
   async cacheCaption(videoId, captionData) {
     try {
+      // Check user's caching preferences
+      const settings = await chrome.storage.sync.get({
+        cachingMode: 'always',
+        minLengthMinutes: 10
+      });
+      
+      // If caching is disabled, don't cache
+      if (settings.cachingMode === 'never') {
+        console.log('SeekSpeak: Caching disabled by user settings');
+        this.captionCache.set(videoId, captionData); // Still cache in memory for session
+        return;
+      }
+      
+      // If length-based caching, check video duration
+      if (settings.cachingMode === 'length-based') {
+        const videoDuration = await this.getVideoDurationInMinutes();
+        if (videoDuration && videoDuration < settings.minLengthMinutes) {
+          console.log(`SeekSpeak: Video too short (${videoDuration}min < ${settings.minLengthMinutes}min), not caching`);
+          this.captionCache.set(videoId, captionData); // Still cache in memory for session
+          return;
+        }
+      }
+      
+      // Cache both in memory and storage
       await chrome.storage.local.set({
         [`captions_${videoId}`]: captionData
       });
       this.captionCache.set(videoId, captionData);
+      console.log('SeekSpeak: Captions cached for', videoId);
     } catch (error) {
       console.warn('SeekSpeak: Error caching captions:', error);
+      // Still cache in memory even if storage fails
+      this.captionCache.set(videoId, captionData);
+    }
+  }
+
+  async getVideoDurationInMinutes() {
+    try {
+      // Try to get duration from YouTube player
+      const player = document.getElementById('movie_player') || 
+                    document.querySelector('.html5-video-player');
+      
+      if (player && player.getDuration) {
+        const durationSeconds = player.getDuration();
+        return Math.round(durationSeconds / 60);
+      }
+      
+      // Fallback: try to get from video element
+      const video = document.querySelector('video');
+      if (video && video.duration) {
+        return Math.round(video.duration / 60);
+      }
+      
+      // Fallback: parse from page info
+      const timeElements = document.querySelectorAll('.ytp-time-duration, .ytd-thumbnail-overlay-time-status-renderer');
+      for (const element of timeElements) {
+        const timeText = element.textContent;
+        if (timeText && timeText.includes(':')) {
+          const parts = timeText.split(':').map(p => parseInt(p));
+          if (parts.length === 2) {
+            return parts[0]; // Minutes
+          } else if (parts.length === 3) {
+            return parts[0] * 60 + parts[1]; // Hours to minutes + minutes
+          }
+        }
+      }
+      
+      return null; // Cannot determine duration
+    } catch (error) {
+      console.warn('SeekSpeak: Error getting video duration:', error);
+      return null;
     }
   }
 

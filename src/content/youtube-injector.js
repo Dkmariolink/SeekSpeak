@@ -15,9 +15,33 @@ class YouTubeInjector {
   async init() {
     console.log('SeekSpeak: YouTube Injector initializing...');
     
+    // Wait for document to be ready
+    if (document.readyState === 'loading') {
+      await new Promise(resolve => {
+        document.addEventListener('DOMContentLoaded', resolve, { once: true });
+      });
+    }
+    
     // Wait for all components to be loaded
     await this.waitForComponents();
     
+    // Set up initialization with multiple triggers for YouTube SPA
+    this.setupInitialization();
+  }
+
+  setupInitialization() {
+    // Try immediate initialization
+    this.tryInitialize();
+    
+    // Set up event listeners for YouTube's SPA navigation
+    this.observePageChanges();
+    
+    // Retry initialization after a delay in case YouTube is still loading
+    setTimeout(() => this.tryInitialize(), 2000);
+    setTimeout(() => this.tryInitialize(), 5000);
+  }
+
+  tryInitialize() {
     // Check if we're on a YouTube video page
     this.isYouTubePage = this.detectVideoPage();
     console.log('SeekSpeak: Is YouTube page?', this.isYouTubePage);
@@ -26,20 +50,13 @@ class YouTubeInjector {
       console.log('SeekSpeak: YouTube video page detected');
       
       // Get current video ID
-      this.currentVideoId = this.extractVideoId();
-      console.log('SeekSpeak: Video ID:', this.currentVideoId);
+      const videoId = this.extractVideoId();
+      console.log('SeekSpeak: Video ID:', videoId);
       
-      if (this.currentVideoId) {
-        // Set up the extension for this video
-        await this.setupExtension();
-        
-        // Monitor for page changes (YouTube SPA navigation)
-        this.observePageChanges();
-        
-        // Listen for messages from background script
+      if (videoId && videoId !== this.currentVideoId) {
+        this.currentVideoId = videoId;
+        this.setupExtension();
         this.setupMessageListeners();
-      } else {
-        console.warn('SeekSpeak: Could not extract video ID');
       }
     } else {
       console.log('SeekSpeak: Not a YouTube video page');
@@ -231,7 +248,7 @@ class YouTubeInjector {
         }
         
         changeTimeout = setTimeout(() => {
-          this.handlePageChange();
+          this.tryInitialize(); // Use tryInitialize instead of handlePageChange
         }, 500); // Wait 500ms for YouTube to settle
       }
     };
@@ -255,7 +272,7 @@ class YouTubeInjector {
     
     document.addEventListener('yt-navigate-finish', () => {
       console.log('SeekSpeak: YouTube navigation finished');
-      setTimeout(handleUrlChange, 200);
+      setTimeout(() => this.tryInitialize(), 200);
     });
     
     // Method 4: Poll for URL changes as fallback (less efficient but reliable)

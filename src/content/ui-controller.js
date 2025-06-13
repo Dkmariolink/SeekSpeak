@@ -326,7 +326,6 @@ class UIController {
   async performSearch(query) {
     if (!query || query.length < 2) {
       this.clearResults();
-      this.updateStatus('Ready to search');
       return;
     }
 
@@ -343,7 +342,7 @@ class UIController {
 
       this.currentResults = results;
       this.displayResults(results, query);
-      this.updateStatus(`Found ${results.length} result${results.length !== 1 ? 's' : ''}`);
+      this.updateResultCount(results.length, query);
 
     } catch (error) {
       console.error('SeekSpeak: Search error:', error);
@@ -579,12 +578,26 @@ class UIController {
     
     this.currentResults = [];
     this.selectedResultIndex = -1;
+    this.updateResultCount(0); // Reset to "Ready to search"
   }
 
   updateStatus(message) {
     const status = this.overlay.querySelector('.seekspeak-status');
     if (status) {
       status.textContent = message;
+    }
+  }
+
+  updateResultCount(count, query = '') {
+    const status = this.overlay.querySelector('.seekspeak-status');
+    if (status) {
+      if (count === 0 && query) {
+        status.textContent = `No results for "${query}"`;
+      } else if (count > 0 && query) {
+        status.textContent = `Found ${count} result${count !== 1 ? 's' : ''} for "${query}"`;
+      } else {
+        status.textContent = 'Ready to search';
+      }
     }
   }
 
