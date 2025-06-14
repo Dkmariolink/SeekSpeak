@@ -28,9 +28,9 @@ class SeekSpeakCustomUI {
           display: inline-flex;
           align-items: center;
           gap: 8px;
-          background: var(--yt-spec-badge-chip-background);
+          background: rgba(255, 255, 255, 0.1);
           color: var(--yt-spec-text-primary);
-          border: 1px solid transparent;
+          border: 1px solid rgba(255, 255, 255, 0.1);
           padding: 8px 16px;
           border-radius: 18px;
           font-size: 14px;
@@ -46,8 +46,8 @@ class SeekSpeakCustomUI {
         }
 
         .seekspeak-button:hover:not(.loading):not(.disabled) {
-          background: var(--yt-spec-text-secondary);
-          color: var(--yt-spec-base-background);
+          background: rgba(255, 255, 255, 0.2);
+          border-color: rgba(255, 255, 255, 0.2);
         }
 
         .seekspeak-button.disabled {
@@ -59,10 +59,24 @@ class SeekSpeakCustomUI {
         }
 
         .seekspeak-button.loading {
-          background: var(--yt-spec-badge-chip-background);
+          background: rgba(255, 255, 255, 0.1);
           color: var(--yt-spec-text-secondary);
+          border-color: rgba(255, 255, 255, 0.1);
           cursor: not-allowed;
           pointer-events: none;
+        }
+
+        .seekspeak-button.retry {
+          background: rgba(255, 193, 7, 0.1);
+          color: var(--yt-spec-text-primary);
+          border: 1px solid rgba(255, 193, 7, 0.3);
+          cursor: pointer;
+          transition: all 0.1s ease;
+        }
+
+        .seekspeak-button.retry:hover {
+          background: rgba(255, 193, 7, 0.2);
+          border-color: rgba(255, 193, 7, 0.5);
         }
 
         .seekspeak-icon {
@@ -142,7 +156,16 @@ class SeekSpeakCustomUI {
   }
 
   createButton() {
-    if (this.button) return;
+    if (this.button) {
+      console.log('SeekSpeak: Button already exists, skipping creation');
+      return true; // Button already exists
+    }
+
+    // Wait for document to be ready
+    if (!document.body) {
+      console.log('SeekSpeak: Document body not ready yet');
+      return false;
+    }
 
     // Find the subscribe button container more precisely
     const subscribeSelectors = [
@@ -154,13 +177,15 @@ class SeekSpeakCustomUI {
     let subscribeElement = null;
     for (const selector of subscribeSelectors) {
       subscribeElement = document.querySelector(selector);
-      if (subscribeElement) break;
+      if (subscribeElement) {
+        console.log('SeekSpeak: Found subscribe button with selector:', selector);
+        break;
+      }
     }
 
     if (!subscribeElement) {
       console.log('SeekSpeak: Subscribe button not found, will retry');
-      setTimeout(() => this.createButton(), 2000);
-      return;
+      return false;
     }
 
     // Find the container that holds the subscribe button
@@ -181,15 +206,18 @@ class SeekSpeakCustomUI {
     // Try to get the icon URL, fallback to text if extension API not available
     let iconHTML = '';
     try {
-      if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.getURL) {
+      if (window.chromeAPIHelper && window.chromeAPIHelper.isContextReady() && 
+          typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.getURL) {
         const iconUrl = chrome.runtime.getURL('assets/icons/icon16.png');
         iconHTML = `<img src="${iconUrl}" alt="SeekSpeak" style="width: 16px; height: 16px;">`;
+        console.log('SeekSpeak: Using extension icon from:', iconUrl);
       } else {
         // Fallback to search icon if chrome API not available
         iconHTML = `<span style="font-size: 14px;">🔍</span>`;
+        console.log('SeekSpeak: Using fallback search icon');
       }
     } catch (error) {
-      console.log('SeekSpeak: Chrome runtime not available, using fallback icon');
+      console.log('SeekSpeak: Chrome runtime not available, using fallback icon:', error);
       iconHTML = `<span style="font-size: 14px;">🔍</span>`;
     }
     
@@ -206,25 +234,40 @@ class SeekSpeakCustomUI {
     });
 
     // Insert after subscribe button
-    if (subscribeElement.nextSibling) {
-      container.insertBefore(this.button, subscribeElement.nextSibling);
-    } else {
-      container.appendChild(this.button);
+    try {
+      if (subscribeElement.nextSibling) {
+        container.insertBefore(this.button, subscribeElement.nextSibling);
+      } else {
+        container.appendChild(this.button);
+      }
+      
+      console.log('SeekSpeak: Button added next to subscribe button successfully');
+      
+      // Set initial loading state
+      this.isLoading = true;
+      this.captionsReady = false;
+      
+      // Check if captions are already available after a brief delay
+      setTimeout(() => this.checkExistingCaptions(), 1000);
+      
+      return true; // Success
+    } catch (error) {
+      console.error('SeekSpeak: Error inserting button:', error);
+      this.button = null; // Clean up on failure
+      return false;
     }
-    
-    console.log('SeekSpeak: Button added next to subscribe');
-    
-    // Set initial loading state
-    this.isLoading = true;
-    this.captionsReady = false;
-    
-    // Check if captions are already available after a brief delay
-    setTimeout(() => this.checkExistingCaptions(), 1000);
   }
 
   // Check if captions are already loaded and update button state accordingly
   checkExistingCaptions() {
     console.log('SeekSpeak: Checking for existing captions');
+    
+    // First, check if the extension is fully initialized
+    if (!this.isExtensionReady()) {
+      console.log('SeekSpeak: Extension not fully ready, will retry in 2 seconds');
+      setTimeout(() => this.checkExistingCaptions(), 2000);
+      return;
+    }
     
     // Use the same logic as the popup for accuracy
     if (window.uiController && typeof window.uiController.getCaptionStatus === 'function') {
@@ -243,6 +286,29 @@ class SeekSpeakCustomUI {
     this.startCaptionFetching();
   }
 
+  // Check if extension components are ready
+  isExtensionReady() {
+    const componentsReady = window.chromeAPIHelper && 
+                           window.captionFetcher && 
+                           window.searchEngine && 
+                           window.uiController;
+    
+    const chromeAPIReady = window.chromeAPIHelper && 
+                          window.chromeAPIHelper.isContextReady && 
+                          window.chromeAPIHelper.isContextReady();
+    
+    console.log('SeekSpeak: Extension readiness check:', {
+      componentsReady,
+      chromeAPIReady,
+      chromeAPIHelper: !!window.chromeAPIHelper,
+      captionFetcher: !!window.captionFetcher,
+      searchEngine: !!window.searchEngine,
+      uiController: !!window.uiController
+    });
+    
+    return componentsReady && chromeAPIReady;
+  }
+
   // Start the caption fetching process with loading state
   startCaptionFetching() {
     if (this.isLoading) {
@@ -250,7 +316,22 @@ class SeekSpeakCustomUI {
       return;
     }
 
+    // Don't start if extension isn't ready
+    if (!this.isExtensionReady()) {
+      console.log('SeekSpeak: Extension not ready, showing retry button');
+      this.updateButtonState('retry', 'Retry');
+      return;
+    }
+
     this.updateButtonState('loading');
+    
+    // Add a timeout to prevent infinite loading (30 seconds)
+    const loadingTimeout = setTimeout(() => {
+      if (this.isLoading) {
+        console.warn('SeekSpeak: Loading timeout reached, showing retry option');
+        this.updateButtonState('retry', 'Retry');
+      }
+    }, 30000);
     
     // Set up periodic checking for when captions become available
     this.checkInterval = setInterval(() => {
@@ -262,8 +343,9 @@ class SeekSpeakCustomUI {
       if (this.checkInterval) {
         clearInterval(this.checkInterval);
         this.checkInterval = null;
+        clearTimeout(loadingTimeout);
         if (this.isLoading) {
-          this.updateButtonState('disabled', 'No Captions');
+          this.updateButtonState('retry', 'Retry');
         }
       }
     }, 30000);
@@ -275,6 +357,7 @@ class SeekSpeakCustomUI {
         console.log('SeekSpeak: Starting caption fetch for video:', videoId);
         
         window.captionFetcher.init(videoId).then((result) => {
+          clearTimeout(loadingTimeout);
           if (this.checkInterval) {
             clearInterval(this.checkInterval);
             this.checkInterval = null;
@@ -288,20 +371,23 @@ class SeekSpeakCustomUI {
             this.updateButtonState('disabled', 'No Captions');
           }
         }).catch((error) => {
+          clearTimeout(loadingTimeout);
           if (this.checkInterval) {
             clearInterval(this.checkInterval);
             this.checkInterval = null;
           }
           console.error('SeekSpeak: Error loading captions:', error);
-          this.updateButtonState('disabled', 'No Captions');
+          this.updateButtonState('retry', 'Retry');
         });
       } else {
+        clearTimeout(loadingTimeout);
         console.error('SeekSpeak: Could not extract video ID');
-        this.updateButtonState('disabled', 'No Captions');
+        this.updateButtonState('disabled', 'No Video');
       }
     } else {
+      clearTimeout(loadingTimeout);
       console.error('SeekSpeak: CaptionFetcher not available');
-      this.updateButtonState('disabled', 'No Captions');
+      this.updateButtonState('retry', 'Retry');
     }
   }
 
@@ -330,7 +416,7 @@ class SeekSpeakCustomUI {
     if (!textSpan) return;
 
     // Remove all previous state classes
-    this.button.classList.remove('loading', 'disabled');
+    this.button.classList.remove('loading', 'disabled', 'retry');
 
     switch (state) {
       case 'loading':
@@ -356,17 +442,33 @@ class SeekSpeakCustomUI {
         this.captionsReady = false;
         this.button.title = 'No captions available for this video';
         break;
+        
+      case 'retry':
+        this.button.className = 'seekspeak-button retry';
+        textSpan.innerHTML = message || 'Retry';
+        this.isLoading = false;
+        this.captionsReady = false;
+        this.button.title = 'Click to retry loading captions';
+        break;
     }
   }
 
   openSeekSpeakSearch() {
     console.log('SeekSpeak: Opening caption search interface');
     
+    // Handle retry state - user clicked to retry loading captions
+    if (this.button && this.button.classList.contains('retry')) {
+      console.log('SeekSpeak: Retry button clicked, attempting to reload captions');
+      this.checkExistingCaptions();
+      return;
+    }
+    
     // Prevent clicking if loading or disabled
     if (this.isLoading || !this.captionsReady) {
       console.log('SeekSpeak: Button click ignored - not ready:', { 
         isLoading: this.isLoading, 
-        captionsReady: this.captionsReady 
+        captionsReady: this.captionsReady,
+        buttonClass: this.button ? this.button.className : 'no button'
       });
       return;
     }
@@ -397,11 +499,23 @@ class SeekSpeakCustomUI {
     return match ? match[1] : null;
   }
 
-  init() {
+  async init() {
     console.log('SeekSpeak: Initializing button UI');
     
-    // Create button
-    this.createButton();
+    // Wait for ChromeAPIHelper to be ready first
+    if (window.chromeAPIHelper) {
+      console.log('SeekSpeak: Waiting for ChromeAPIHelper to be ready...');
+      await window.chromeAPIHelper.readyPromise;
+      console.log('SeekSpeak: ChromeAPIHelper is ready for custom UI');
+    } else {
+      console.warn('SeekSpeak: ChromeAPIHelper not available, continuing with limited functionality');
+    }
+    
+    // Create button with retry logic
+    await this.createButtonWithRetry();
+    
+    // Set up automatic retry when extension becomes ready
+    this.setupExtensionReadyListener();
     
     // Listen for badge status updates to sync button state with proper error handling
     try {
@@ -422,7 +536,7 @@ class SeekSpeakCustomUI {
     
     // Re-add button on navigation with proper cleanup
     document.addEventListener('yt-navigate-finish', () => {
-      setTimeout(() => {
+      setTimeout(async () => {
         // Clean up old button and intervals
         if (this.checkInterval) {
           clearInterval(this.checkInterval);
@@ -435,10 +549,50 @@ class SeekSpeakCustomUI {
         this.captionsReady = false;
         this.isLoading = false;
         
-        // Create new button
-        this.createButton();
+        // Create new button with retry logic
+        await this.createButtonWithRetry();
       }, 1000);
     });
+  }
+
+  setupExtensionReadyListener() {
+    // Check periodically if extension becomes ready and button is in retry state
+    const readyCheckInterval = setInterval(() => {
+      if (this.button && this.button.classList.contains('retry') && this.isExtensionReady()) {
+        console.log('SeekSpeak: Extension became ready, auto-retrying caption loading');
+        clearInterval(readyCheckInterval);
+        this.checkExistingCaptions();
+      }
+    }, 2000);
+    
+    // Stop checking after 2 minutes
+    setTimeout(() => {
+      clearInterval(readyCheckInterval);
+    }, 120000);
+  }
+
+  async createButtonWithRetry() {
+    const maxAttempts = 10; // Try for up to 10 seconds
+    let attempt = 0;
+    
+    while (attempt < maxAttempts) {
+      try {
+        const success = await this.createButton();
+        if (success) {
+          console.log('SeekSpeak: Button created successfully on attempt', attempt + 1);
+          return true;
+        }
+      } catch (error) {
+        console.warn(`SeekSpeak: Button creation attempt ${attempt + 1} failed:`, error);
+      }
+      
+      attempt++;
+      console.log(`SeekSpeak: Button creation attempt ${attempt} failed, retrying in 1 second...`);
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+    
+    console.error('SeekSpeak: Failed to create button after', maxAttempts, 'attempts');
+    return false;
   }
 
   syncButtonWithBadgeStatus(badgeStatus) {

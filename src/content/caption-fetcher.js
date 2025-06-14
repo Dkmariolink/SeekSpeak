@@ -1121,12 +1121,35 @@ class CaptionFetcher {
   // Cache management methods
   async getCachedCaptions(videoId) {
     try {
-      const result = await chrome.storage.local.get([`captions_${videoId}`]);
+      // Always check memory cache first
+      const memoryCache = this.captionCache.get(videoId);
+      if (memoryCache) {
+        console.log('SeekSpeak: Using memory cached captions for', videoId);
+        return memoryCache;
+      }
+
+      // Only try persistent storage if ChromeAPIHelper is ready and stable
+      if (!window.chromeAPIHelper || !window.chromeAPIHelper.isContextReady()) {
+        console.log('SeekSpeak: ChromeAPIHelper not ready, skipping persistent storage');
+        return null;
+      }
+
+      // Conservative approach: test storage access first
+      try {
+        await window.chromeAPIHelper.storageGet({ _test: 'test' });
+      } catch (error) {
+        if (error.message && error.message.includes('Extension context invalidated')) {
+          console.log('SeekSpeak: Storage not stable yet, using memory cache only');
+          return null;
+        }
+      }
+
+      const result = await window.chromeAPIHelper.storageLocalGet([`captions_${videoId}`]);
       const cached = result[`captions_${videoId}`];
       
       if (cached && cached.processedAt) {
         // Get user's cache expiration setting
-        const settings = await chrome.storage.sync.get({
+        const settings = await window.chromeAPIHelper.storageGet({
           cacheExpirationDays: 7 // Default 1 week
         });
         
@@ -1153,21 +1176,46 @@ class CaptionFetcher {
           // Cache expired, remove it
           const ageDays = (ageMs / (1000 * 60 * 60 * 24)).toFixed(1);
           console.log(`SeekSpeak: Cache expired for video ${videoId} (${ageDays} days old, limit: ${settings.cacheExpirationDays} days)`);
-          await chrome.storage.local.remove([`captions_${videoId}`]);
+          await window.chromeAPIHelper.storageLocalRemove([`captions_${videoId}`]);
         }
       }
       
       return null;
     } catch (error) {
-      console.warn('SeekSpeak: Error reading cached captions:', error);
-      return null;
+      if (error.message && error.message.includes('Extension context invalidated')) {
+        console.warn('SeekSpeak: Extension context invalidated during cache read - using memory cache');
+        return this.captionCache.get(videoId) || null;
+      } else {
+        console.warn('SeekSpeak: Error reading cached captions:', error);
+        return this.captionCache.get(videoId) || null;
+      }
     }
   }
 
   async cacheCaption(videoId, captionData) {
     try {
+      // Always cache in memory first
+      this.captionCache.set(videoId, captionData);
+
+      // Check if ChromeAPIHelper is available and ready
+      if (!window.chromeAPIHelper || !window.chromeAPIHelper.isContextReady()) {
+        console.log('SeekSpeak: ChromeAPIHelper not ready, using memory cache only for now');
+        return;
+      }
+
+      // Conservative approach: skip persistent storage on fresh installs
+      // Check if this appears to be a fresh install by testing storage access
+      try {
+        await window.chromeAPIHelper.storageGet({ _test: 'test' });
+      } catch (error) {
+        if (error.message && error.message.includes('Extension context invalidated')) {
+          console.log('SeekSpeak: Fresh install detected, using memory cache only');
+          return;
+        }
+      }
+
       // Check user's caching preferences
-      const settings = await chrome.storage.sync.get({
+      const settings = await window.chromeAPIHelper.storageGet({
         cachingMode: 'always',
         minLengthMinutes: 10,
         maxCachedVideos: 50, // Default limit of 50 videos
@@ -1213,11 +1261,10 @@ class CaptionFetcher {
       // Enforce cache limit using FIFO (First In, First Out)
       await this.enforceCacheLimit(videoId, settings.maxCachedVideos);
       
-      // Cache both in memory and storage
-      await chrome.storage.local.set({
+      // Cache in persistent storage
+      await window.chromeAPIHelper.storageLocalSet({
         [`captions_${videoId}`]: captionData
       });
-      this.captionCache.set(videoId, captionData);
       
       if (settings.cacheExpirationDays === 'never') {
         console.log('SeekSpeak: Captions cached for', videoId, '(never expires)');
@@ -1265,7 +1312,7 @@ class CaptionFetcher {
   async enforceCacheLimit(newVideoId, maxCachedVideos) {
     try {
       // Get all cached captions
-      const allData = await chrome.storage.local.get(null);
+      const allData = await window.chromeAPIHelper.storageLocalGet(null);
       const cachedVideos = Object.keys(allData)
         .filter(key => key.startsWith('captions_'))
         .map(key => ({
@@ -1300,7 +1347,7 @@ class CaptionFetcher {
         
         if (toRemove.length > 0) {
           const keysToRemove = toRemove.map(item => item.key);
-          await chrome.storage.local.remove(keysToRemove);
+          await window.chromeAPIHelper.storageLocalRemove(keysToRemove);
           
           // Also remove from memory cache
           toRemove.forEach(item => {

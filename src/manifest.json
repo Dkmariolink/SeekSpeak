@@ -33,6 +33,7 @@
         "https://youtube.com/watch*"
       ],
       "js": [
+        "content/chrome-api-helper.js",
         "content/custom-ui.js",
         "content/caption-fetcher.js",
         "content/search-engine.js", 

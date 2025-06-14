@@ -228,11 +228,21 @@ class UIController {
     // Get user's custom keyboard shortcut with error handling
     let settings;
     try {
-      settings = await chrome.storage.sync.get({
-        searchShortcut: 'Ctrl+Shift+F' // Default shortcut
-      });
+      // Ensure ChromeAPIHelper is available
+      if (!window.chromeAPIHelper) {
+        console.warn('SeekSpeak: ChromeAPIHelper not available, using default keyboard settings');
+        settings = { searchShortcut: 'Ctrl+Shift+F' };
+      } else {
+        settings = await window.chromeAPIHelper.storageGet({
+          searchShortcut: 'Ctrl+Shift+F' // Default shortcut
+        });
+      }
     } catch (error) {
-      console.warn('SeekSpeak: Could not load keyboard settings, using default:', error);
+      if (error.message && error.message.includes('Extension context invalidated')) {
+        console.warn('SeekSpeak: Extension context invalidated during keyboard setup, using default');
+      } else {
+        console.warn('SeekSpeak: Could not load keyboard settings, using default:', error);
+      }
       settings = { searchShortcut: 'Ctrl+Shift+F' };
     }
 
