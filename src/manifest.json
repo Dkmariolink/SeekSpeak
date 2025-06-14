@@ -11,6 +11,15 @@
     "tabs"
   ],
   
+  "commands": {
+    "open-search": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+F"
+      },
+      "description": "Open SeekSpeak caption search"
+    }
+  },
+  
   "host_permissions": [
     "https://www.youtube.com/*"
   ],

@@ -307,20 +307,17 @@ class UIController {
 
     // Listen for settings updates to refresh shortcut with error handling
     this.messageHandler = (message, sender, sendResponse) => {
-      // Handle settings updates
+      // Only handle settings updates here, other messages are handled by youtube-injector
       if (message.type === 'SETTINGS_UPDATED' && message.settings.searchShortcut) {
         console.log('SeekSpeak: Updating keyboard shortcut to:', message.settings.searchShortcut);
         this.currentShortcut = message.settings.searchShortcut;
       }
-      
-      // Handle other UI messages
-      this.handleMessage(message, sender, sendResponse);
     };
     
     try {
       if (chrome && chrome.runtime && chrome.runtime.onMessage) {
         chrome.runtime.onMessage.addListener(this.messageHandler);
-        console.log('SeekSpeak: Message listener added for settings updates');
+        console.log('SeekSpeak: UI Controller message listener added for settings updates');
       } else {
         console.warn('SeekSpeak: Chrome runtime not available, settings updates may not work');
       }

@@ -17,6 +17,24 @@
 
     <main>
       <section class="setting-section">
+        <h2>Keyboard Shortcuts</h2>
+        <p class="description">
+          Customize the keyboard shortcut to open SeekSpeak search overlay.
+        </p>
+        
+        <div class="setting-group">
+          <div class="shortcut-setting">
+            <label for="search-shortcut">Search shortcut:</label>
+            <div class="shortcut-input-group">
+              <input type="text" id="search-shortcut" readonly placeholder="Click to set shortcut">
+              <button id="clear-shortcut" class="btn btn-secondary">Clear</button>
+            </div>
+            <small>Click the input field and press your desired key combination</small>
+          </div>
+        </div>
+      </section>
+
+      <section class="setting-section">
         <h2>Caption Caching</h2>
         <p class="description">
           Control when SeekSpeak automatically caches video captions for faster future searches.
@@ -64,13 +82,39 @@
       <section class="setting-section">
         <h2>Storage Management</h2>
         <p class="description">
-          Manage cached caption data.
+          Manage cached caption data and storage preferences.
         </p>
+        
+        <div class="setting-group">
+          <div class="storage-setting">
+            <label for="max-videos">Maximum cached videos:</label>
+            <div class="number-input">
+              <input type="number" id="max-videos" min="1" max="1000" value="50">
+              <span>videos</span>
+            </div>
+            <small>Older videos will be removed when this limit is reached</small>
+          </div>
+          
+          <div class="storage-setting">
+            <label for="cache-expiration">Cache expiration:</label>
+            <div class="select-input">
+              <select id="cache-expiration">
+                <option value="1">1 day</option>
+                <option value="7" selected>1 week</option>
+                <option value="30">1 month</option>
+                <option value="90">3 months</option>
+                <option value="365">1 year</option>
+                <option value="never">Never expire</option>
+              </select>
+            </div>
+            <small>Cached captions older than this will be automatically removed</small>
+          </div>
+        </div>
         
         <div class="storage-info">
           <div class="storage-item">
             <strong>Cached videos:</strong>
-            <span id="cached-count">Loading...</span>
+            <span id="cached-count" class="clickable-count">Loading...</span>
           </div>
           <div class="storage-item">
             <strong>Storage used:</strong>
@@ -106,6 +150,19 @@
 
   <div id="toast" class="toast" style="display: none;">
     <span id="toast-message"></span>
+  </div>
+
+  <!-- Cache Browser Modal -->
+  <div id="cache-browser-modal" class="modal" style="display: none;">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>Cached Videos</h2>
+        <button id="close-cache-browser" class="close-btn">&times;</button>
+      </div>
+      <div id="cache-browser-content" class="modal-body">
+        Loading cached videos...
+      </div>
+    </div>
   </div>
 
   <script src="options.js"></script>

@@ -27,6 +27,9 @@ class PopupController {
     // Set up event listeners
     this.setupEventListeners();
     
+    // Load and display the current keyboard shortcut
+    await this.loadKeyboardShortcut();
+    
     // Get current tab and check if it's YouTube
     await this.checkCurrentTab();
     
@@ -34,11 +37,42 @@ class PopupController {
     this.updateUI();
   }
 
+  async loadKeyboardShortcut() {
+    try {
+      // Get the current keyboard shortcut from storage
+      const settings = await chrome.storage.sync.get({
+        searchShortcut: 'Ctrl+Shift+F' // Default shortcut
+      });
+      
+      console.log('SeekSpeak Popup: Loaded shortcut:', settings.searchShortcut);
+      
+      // Update the shortcut display in the button and help text
+      const shortcutElements = document.querySelectorAll('.button-shortcut, .popup-help kbd');
+      shortcutElements.forEach(element => {
+        element.textContent = settings.searchShortcut;
+      });
+      
+    } catch (error) {
+      console.warn('SeekSpeak Popup: Could not load keyboard shortcut:', error);
+      // Keep default values if loading fails
+    }
+  }
+
   setupEventListeners() {
     // Search button click
     this.elements.searchButton.addEventListener('click', () => {
       this.openSearch();
     });
+
+    // Options link click
+    const optionsLink = document.getElementById('options-link');
+    if (optionsLink) {
+      optionsLink.addEventListener('click', (e) => {
+        e.preventDefault();
+        chrome.runtime.openOptionsPage();
+        window.close(); // Close popup after opening options
+      });
+    }
 
     // Keyboard shortcuts
     document.addEventListener('keydown', (e) => {
@@ -217,22 +251,37 @@ class PopupController {
   }
 
   async openSearch() {
+    console.log('SeekSpeak Popup: openSearch called');
+    console.log('SeekSpeak Popup: isYouTubeVideo:', this.isYouTubeVideo);
+    console.log('SeekSpeak Popup: videoInfo:', this.videoInfo);
+    console.log('SeekSpeak Popup: currentTab:', this.currentTab);
+
     if (!this.isYouTubeVideo || !this.videoInfo) {
+      console.log('SeekSpeak Popup: Not a YouTube video or no video info');
+      return;
+    }
+
+    if (!this.currentTab || !this.currentTab.id) {
+      console.log('SeekSpeak Popup: No current tab or tab ID');
       return;
     }
 
     try {
+      console.log('SeekSpeak Popup: Sending OPEN_SEARCH message to tab:', this.currentTab.id);
+      
       // Send message to content script to open search overlay
       await chrome.tabs.sendMessage(this.currentTab.id, {
         type: 'OPEN_SEARCH'
       });
+      
+      console.log('SeekSpeak Popup: Message sent successfully');
       
       // Close popup after opening search
       window.close();
       
     } catch (error) {
       console.error('SeekSpeak Popup: Error opening search:', error);
-      this.setStatus('error', 'Failed to open search');
+      this.setStatus('error', 'Failed to open search: ' + error.message);
     }
   }
 
@@ -255,6 +304,17 @@ class PopupController {
           this.elements.captionStatus.textContent = `${message.count} segments available`;
         } else {
           this.elements.captionStatus.textContent = 'No captions available';
+        }
+        break;
+        
+      case 'SETTINGS_UPDATED':
+        // Update keyboard shortcut display if settings changed
+        if (message.settings && message.settings.searchShortcut) {
+          console.log('SeekSpeak Popup: Updating shortcut display to:', message.settings.searchShortcut);
+          const shortcutElements = document.querySelectorAll('.button-shortcut, .popup-help kbd');
+          shortcutElements.forEach(element => {
+            element.textContent = message.settings.searchShortcut;
+          });
         }
         break;
         

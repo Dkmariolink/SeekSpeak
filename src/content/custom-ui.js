@@ -28,9 +28,9 @@ class SeekSpeakCustomUI {
           display: inline-flex;
           align-items: center;
           gap: 8px;
-          background: var(--yt-spec-button-chip-background-hover);
+          background: var(--yt-spec-badge-chip-background);
           color: var(--yt-spec-text-primary);
-          border: 1px solid var(--yt-spec-10-percent-layer);
+          border: 1px solid transparent;
           padding: 8px 16px;
           border-radius: 18px;
           font-size: 14px;
@@ -46,20 +46,20 @@ class SeekSpeakCustomUI {
         }
 
         .seekspeak-button:hover:not(.loading):not(.disabled) {
-          background: var(--yt-spec-button-chip-background-hover);
-          border-color: var(--yt-spec-call-to-action);
+          background: var(--yt-spec-text-secondary);
+          color: var(--yt-spec-base-background);
         }
 
         .seekspeak-button.disabled {
           background: var(--yt-spec-button-chip-background-disabled);
           color: var(--yt-spec-text-disabled);
-          border-color: var(--yt-spec-10-percent-layer);
+          border-color: transparent;
           cursor: not-allowed;
           opacity: 0.6;
         }
 
         .seekspeak-button.loading {
-          background: var(--yt-spec-button-chip-background-hover);
+          background: var(--yt-spec-badge-chip-background);
           color: var(--yt-spec-text-secondary);
           cursor: not-allowed;
           pointer-events: none;
