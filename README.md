@@ -66,4 +66,4 @@ SeekSpeak is open source! Contributions are welcome.
 
 ## License
 
-MIT License - see LICENSE file for details
+MIT License - see [LICENSE](https://github.com/Dkmariolink/SeekSpeak/tree/master?tab=MIT-1-ov-file#readme) for details
