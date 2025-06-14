@@ -142,10 +142,14 @@ class YouTubeInjector {
   async setupExtension() {
     try {
       // Update badge to show loading
-      chrome.runtime.sendMessage({
-        type: 'UPDATE_BADGE',
-        status: 'loading'
-      });
+      try {
+        chrome.runtime.sendMessage({
+          type: 'UPDATE_BADGE',
+          status: 'loading'
+        });
+      } catch (error) {
+        console.log('SeekSpeak: Could not send badge update (background script not ready)');
+      }
 
       // Wait for video player to be ready
       await this.waitForVideoPlayer();
@@ -163,11 +167,15 @@ class YouTubeInjector {
             if (indexBuilt) {
               console.log('SeekSpeak: Search index built successfully');
               
-              // Update badge to show ready
-              chrome.runtime.sendMessage({
-                type: 'UPDATE_BADGE',
-                status: 'found'
-              });
+              // Update badge to show ready/found
+              try {
+                chrome.runtime.sendMessage({
+                  type: 'UPDATE_BADGE',
+                  status: 'found'
+                });
+              } catch (error) {
+                console.log('SeekSpeak: Could not send badge update (background script not ready)');
+              }
               
               // Initialize UI controller
               if (window.uiController) {
@@ -178,36 +186,76 @@ class YouTubeInjector {
                 return true; // Success
               } else {
                 console.error('SeekSpeak: UI controller not available');
+                try {
+                  chrome.runtime.sendMessage({
+                    type: 'UPDATE_BADGE',
+                    status: 'error'
+                  });
+                } catch (error) {
+                  console.log('SeekSpeak: Could not send badge update (background script not ready)');
+                }
                 return false;
               }
             } else {
               console.warn('SeekSpeak: Failed to build search index');
+              try {
+                chrome.runtime.sendMessage({
+                  type: 'UPDATE_BADGE',
+                  status: 'error'
+                });
+              } catch (error) {
+                console.log('SeekSpeak: Could not send badge update (background script not ready)');
+              }
               return false;
             }
           } else {
             console.error('SeekSpeak: Search engine not available');
+            try {
+              chrome.runtime.sendMessage({
+                type: 'UPDATE_BADGE',
+                status: 'error'
+              });
+            } catch (error) {
+              console.log('SeekSpeak: Could not send badge update (background script not ready)');
+            }
             return false;
           }
         } else {
           console.warn('SeekSpeak: No caption data available');
-          chrome.runtime.sendMessage({
-            type: 'UPDATE_BADGE',
-            status: 'warning'
-          });
+          try {
+            chrome.runtime.sendMessage({
+              type: 'UPDATE_BADGE',
+              status: 'warning'
+            });
+          } catch (error) {
+            console.log('SeekSpeak: Could not send badge update (background script not ready)');
+          }
           return false;
         }
       } else {
         console.error('SeekSpeak: Caption fetcher not available');
+        try {
+          chrome.runtime.sendMessage({
+            type: 'UPDATE_BADGE',
+            status: 'error'
+          });
+        } catch (error) {
+          console.log('SeekSpeak: Could not send badge update (background script not ready)');
+        }
         return false;
       }
       
     } catch (error) {
       console.error('SeekSpeak setup error:', error);
       
-      chrome.runtime.sendMessage({
-        type: 'UPDATE_BADGE',
-        status: 'error'
-      });
+      try {
+        chrome.runtime.sendMessage({
+          type: 'UPDATE_BADGE',
+          status: 'error'
+        });
+      } catch (sendError) {
+        console.log('SeekSpeak: Could not send badge update (background script not ready)');
+      }
       
       return false;
     }
@@ -343,10 +391,6 @@ class YouTubeInjector {
   setupMessageListeners() {
     chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       switch (message.type) {
-        case 'OPEN_SEARCH':
-          this.openSearchOverlay();
-          break;
-          
         case 'GET_CURRENT_VIDEO':
           sendResponse({
             videoId: this.currentVideoId,
@@ -356,20 +400,12 @@ class YouTubeInjector {
           break;
           
         default:
-          // Forward to other components
-          if (window.uiController) {
+          // Forward other messages to UI controller
+          if (window.uiController && window.uiController.handleMessage) {
             window.uiController.handleMessage(message, sender, sendResponse);
           }
       }
     });
-  }
-
-  openSearchOverlay() {
-    if (window.uiController) {
-      window.uiController.showSearchOverlay();
-    } else {
-      console.warn('SeekSpeak: UI controller not ready');
-    }
   }
 
   cleanup() {
@@ -386,11 +422,11 @@ class YouTubeInjector {
   }
 }
 
-// Enhanced initialization system for new tab compatibility
+// Enhanced initialization system for new tab compatibility and first-time loading
 console.log('SeekSpeak: YouTube Injector script loaded on:', window.location.href);
 console.log('SeekSpeak: Document ready state at load:', document.readyState);
 
-// Enhanced initialization with comprehensive error handling and new tab support
+// Enhanced initialization with comprehensive error handling and robust retry system
 function initializeSeekSpeak() {
   try {
     console.log('SeekSpeak: Attempting initialization on', window.location.href);
@@ -431,13 +467,13 @@ function initializeSeekSpeak() {
       console.log('SeekSpeak: uiController:', !!window.uiController);
       console.log('SeekSpeak: seekSpeakCustomUI:', !!window.seekSpeakCustomUI);
       
-      // Retry in 1 second
+      // More aggressive retry for first-time loading
       setTimeout(() => {
         if (!window.seekSpeakInjector) {
           console.log('SeekSpeak: Retrying initialization after component load delay');
           initializeSeekSpeak();
         }
-      }, 1000);
+      }, 500);
       return;
     }
     
@@ -459,13 +495,13 @@ function initializeSeekSpeak() {
     console.error('SeekSpeak: Failed to initialize:', error);
     console.error('SeekSpeak: Error stack:', error.stack);
     
-    // Retry after 2 seconds
+    // More aggressive retry after error
     setTimeout(() => {
       console.log('SeekSpeak: Retrying initialization after error...');
       if (!window.seekSpeakInjector) {
         initializeSeekSpeak();
       }
-    }, 2000);
+    }, 1000);
   }
 }
 
@@ -476,29 +512,32 @@ function extractVideoIdFromUrl() {
   return match ? match[1] : null;
 }
 
-// Multiple initialization strategies for maximum compatibility
-console.log('SeekSpeak: Setting up initialization strategies');
+// Multiple initialization strategies for maximum compatibility with first-time loading
+console.log('SeekSpeak: Setting up enhanced initialization strategies');
 
 // Strategy 1: Immediate initialization if page already loaded
 if (document.readyState === 'loading') {
   console.log('SeekSpeak: Document still loading, waiting for DOMContentLoaded');
   document.addEventListener('DOMContentLoaded', () => {
     console.log('SeekSpeak: DOMContentLoaded fired, initializing');
-    setTimeout(initializeSeekSpeak, 100);
+    setTimeout(initializeSeekSpeak, 50);
   });
 } else {
   // Page already loaded
   console.log('SeekSpeak: Document already loaded, initializing immediately');
-  setTimeout(initializeSeekSpeak, 100);
+  setTimeout(initializeSeekSpeak, 50);
 }
 
-// Strategy 2: Additional safety net for YouTube SPA navigation
-setTimeout(() => {
-  if (!window.seekSpeakInjector && window.location.href.includes('/watch')) {
-    console.log('SeekSpeak: Safety net initialization triggered for watch page');
-    initializeSeekSpeak();
-  }
-}, 3000);
+// Strategy 2: More aggressive safety nets for first-time loading
+const retryIntervals = [1000, 2000, 3000, 5000]; // More frequent retries
+retryIntervals.forEach((delay, index) => {
+  setTimeout(() => {
+    if (!window.seekSpeakInjector && window.location.href.includes('/watch')) {
+      console.log(`SeekSpeak: Safety net initialization ${index + 1} triggered (${delay}ms)`);
+      initializeSeekSpeak();
+    }
+  }, delay);
+});
 
 // Strategy 3: Listen for YouTube navigation events
 document.addEventListener('yt-navigate-finish', () => {
@@ -508,26 +547,57 @@ document.addEventListener('yt-navigate-finish', () => {
       console.log('SeekSpeak: Post-navigation initialization triggered');
       initializeSeekSpeak();
     }
-  }, 500);
+  }, 200);
 });
 
-// Strategy 4: Visibility change detection (for new tabs)
+// Strategy 4: Enhanced visibility change detection (for new tabs and first-time loading)
 document.addEventListener('visibilitychange', () => {
   if (!document.hidden && window.location.href.includes('/watch')) {
     console.log('SeekSpeak: Page became visible, checking initialization');
-    if (!window.seekSpeakInjector) {
-      console.log('SeekSpeak: Visibility-based initialization triggered');
+    setTimeout(() => {
+      if (!window.seekSpeakInjector) {
+        console.log('SeekSpeak: Visibility-based initialization triggered');
+        initializeSeekSpeak();
+      }
+    }, 100);
+  }
+});
+
+// Strategy 5: Focus event detection (for new tabs and window switching)
+window.addEventListener('focus', () => {
+  if (window.location.href.includes('/watch') && !window.seekSpeakInjector) {
+    console.log('SeekSpeak: Window focus initialization triggered');
+    setTimeout(initializeSeekSpeak, 100);
+  }
+});
+
+// Strategy 6: NEW - MutationObserver for DOM changes (detect when YouTube fully loads)
+const initObserver = new MutationObserver((mutations) => {
+  if (!window.seekSpeakInjector && window.location.href.includes('/watch')) {
+    // Check if critical YouTube elements are now present
+    const playerElement = document.getElementById('movie_player');
+    const subscribeButton = document.querySelector('ytd-subscribe-button-renderer');
+    
+    if (playerElement && subscribeButton) {
+      console.log('SeekSpeak: YouTube player and UI detected via MutationObserver');
       setTimeout(initializeSeekSpeak, 200);
     }
   }
 });
 
-// Strategy 5: Focus event detection (for new tabs)
-window.addEventListener('focus', () => {
-  if (window.location.href.includes('/watch') && !window.seekSpeakInjector) {
-    console.log('SeekSpeak: Window focus initialization triggered');
-    setTimeout(initializeSeekSpeak, 200);
-  }
-});
+// Start observing once document is available
+if (document.body) {
+  initObserver.observe(document.body, {
+    childList: true,
+    subtree: true
+  });
+} else {
+  document.addEventListener('DOMContentLoaded', () => {
+    initObserver.observe(document.body, {
+      childList: true,
+      subtree: true
+    });
+  });
+}
 
-console.log('SeekSpeak: All initialization strategies set up');
+console.log('SeekSpeak: All initialization strategies set up with enhanced first-time loading support');

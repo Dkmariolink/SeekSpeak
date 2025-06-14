@@ -16,9 +16,6 @@ class BackgroundService {
     // Message handling - handled globally below 
     // chrome.runtime.onMessage.addListener(this.handleMessage.bind(this));
     
-    // Command handling (keyboard shortcuts)
-    chrome.commands.onCommand.addListener(this.handleCommand.bind(this));
-    
     // Tab updates for YouTube navigation
     chrome.tabs.onUpdated.addListener(this.onTabUpdated.bind(this));
     
@@ -76,22 +73,6 @@ class BackgroundService {
     }
   }
 
-  async handleCommand(command) {
-    if (command === 'open-search') {
-      // Get active YouTube tab
-      const [tab] = await chrome.tabs.query({ 
-        active: true, 
-        currentWindow: true,
-        url: 'https://www.youtube.com/watch*'
-      });
-      
-      if (tab) {
-        // Send message to content script to open search
-        chrome.tabs.sendMessage(tab.id, { type: 'OPEN_SEARCH' });
-      }
-    }
-  }
-
   async onTabUpdated(tabId, changeInfo, tab) {
     // Only process YouTube video pages
     if (changeInfo.status === 'complete' && 
@@ -143,6 +124,18 @@ class BackgroundService {
       tabId,
       color: badgeColor[status] || '#4285f4'
     });
+
+    // Notify content script about badge status change for button sync
+    try {
+      await chrome.tabs.sendMessage(tabId, {
+        type: 'BADGE_STATUS_UPDATE',
+        status: status
+      });
+      console.log('SeekSpeak Background: Sent badge status update to content script:', status);
+    } catch (error) {
+      // Content script might not be ready yet, that's okay
+      console.log('SeekSpeak Background: Could not send badge update to content script (tab not ready)');
+    }
   }
 
   async storeCaptions(videoId, captions) {

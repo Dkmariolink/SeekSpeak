@@ -473,56 +473,33 @@ class CaptionFetcher {
           transcriptItems = existingTranscriptItems;
         } else {
           // Transcript not open, we need to open it temporarily
-          console.log('SeekSpeak: [DEBUG] Pre-hiding all transcript areas to prevent flash');
+          console.log('SeekSpeak: [DEBUG] Applying minimal hiding to allow content population');
           
-          const ultimatePreventFlashStyle = document.createElement('style');
-          ultimatePreventFlashStyle.id = 'seekspeak-ultimate-prevent-flash';
-          ultimatePreventFlashStyle.textContent = `
-            /* ULTIMATE TRANSCRIPT FLASH PREVENTION - Applied BEFORE clicking */
+          const minimalHideStyle = document.createElement('style');
+          minimalHideStyle.id = 'seekspeak-minimal-hide';
+          minimalHideStyle.textContent = `
+            /* MINIMAL hiding - allows DOM population but reduces visual impact */
             #engagement-panel-searchable-transcript,
             .ytd-engagement-panel-section-list-renderer,
-            ytd-engagement-panel-section-list-renderer,
-            [data-target-id="engagement-panel-searchable-transcript"],
-            tp-yt-paper-dialog,
-            #secondary-inner #panels ytd-engagement-panel-section-list-renderer,
-            #panels.ytd-watch-flexy ytd-engagement-panel-section-list-renderer,
-            #secondary #panels.ytd-watch-flexy,
-            #secondary #panels {
-              display: none !important;
-              opacity: 0 !important;
-              visibility: hidden !important;
-              position: fixed !important;
-              left: -99999px !important;
-              top: -99999px !important;
-              width: 1px !important;
-              height: 1px !important;
+            ytd-engagement-panel-section-list-renderer {
+              opacity: 0.05 !important;
               pointer-events: none !important;
-              z-index: -9999 !important;
-              transform: translateX(-100000px) translateY(-100000px) !important;
-              clip: rect(0 0 0 0) !important;
-              clip-path: inset(100%) !important;
-              overflow: hidden !important;
-            }
-            
-            /* Prevent any engagement panels from affecting layout */
-            ytd-engagement-panel-section-list-renderer,
-            ytd-engagement-panel-section-list-renderer * {
-              display: none !important;
-              opacity: 0 !important;
-              visibility: hidden !important;
+              z-index: -1 !important;
+              transition: none !important;
             }
           `;
           
-          // Apply IMMEDIATELY before any button clicking
-          document.head.appendChild(ultimatePreventFlashStyle);
-          document.documentElement.classList.add('seekspeak-extraction-mode');
+          // Apply minimal hiding that allows content population
+          document.head.appendChild(minimalHideStyle);
           
-          console.log('SeekSpeak: [DEBUG] All transcript areas pre-hidden, now clicking button');
+          console.log('SeekSpeak: [DEBUG] Clicking transcript button to populate content');
           
           // Click the transcript button to open/load content
           transcriptButton.click();
           
-          // CRITICAL: Wait for YouTube to populate transcript content before hiding
+          // Wait longer for YouTube to populate transcript content
+          console.log('SeekSpeak: [DEBUG] Waiting for transcript content to populate...');
+          await new Promise(resolve => setTimeout(resolve, 1500));
           console.log('SeekSpeak: [DEBUG] Waiting for transcript content to load before hiding...');
           await new Promise(resolve => setTimeout(resolve, 800)); // Allow content to load
           
@@ -694,11 +671,11 @@ class CaptionFetcher {
       // Remove extraction mode class
       document.documentElement.classList.remove('seekspeak-extraction-mode');
       
-      // Remove ultimate flash prevention style
-      const ultimateStyle = document.getElementById('seekspeak-ultimate-prevent-flash');
-      if (ultimateStyle) {
-        ultimateStyle.remove();
-        console.log('SeekSpeak: [DEBUG] Removed ultimate flash prevention style');
+      // Remove minimal hiding style
+      const minimalStyle = document.getElementById('seekspeak-minimal-hide');
+      if (minimalStyle) {
+        minimalStyle.remove();
+        console.log('SeekSpeak: [DEBUG] Removed minimal hiding style');
       }
     }
     
@@ -1148,10 +1125,35 @@ class CaptionFetcher {
       const cached = result[`captions_${videoId}`];
       
       if (cached && cached.processedAt) {
-        // Check if cache is still valid (24 hours)
-        const ageHours = (Date.now() - cached.processedAt) / (1000 * 60 * 60);
-        if (ageHours < 24) {
+        // Get user's cache expiration setting
+        const settings = await chrome.storage.sync.get({
+          cacheExpirationDays: 7 // Default 1 week
+        });
+        
+        // Check if cache should never expire
+        if (settings.cacheExpirationDays === 'never') {
+          // Update access time for better cache management
+          if (!cached.cachedAt) {
+            cached.cachedAt = cached.processedAt; // Backwards compatibility
+          }
           return cached;
+        }
+        
+        // Check if cache is still valid based on user setting
+        const expirationMs = settings.cacheExpirationDays * 24 * 60 * 60 * 1000; // Convert days to ms
+        const ageMs = Date.now() - cached.processedAt;
+        
+        if (ageMs < expirationMs) {
+          // Update access time for better cache management
+          if (!cached.cachedAt) {
+            cached.cachedAt = cached.processedAt; // Backwards compatibility
+          }
+          return cached;
+        } else {
+          // Cache expired, remove it
+          const ageDays = (ageMs / (1000 * 60 * 60 * 24)).toFixed(1);
+          console.log(`SeekSpeak: Cache expired for video ${videoId} (${ageDays} days old, limit: ${settings.cacheExpirationDays} days)`);
+          await chrome.storage.local.remove([`captions_${videoId}`]);
         }
       }
       
@@ -1167,7 +1169,9 @@ class CaptionFetcher {
       // Check user's caching preferences
       const settings = await chrome.storage.sync.get({
         cachingMode: 'always',
-        minLengthMinutes: 10
+        minLengthMinutes: 10,
+        maxCachedVideos: 50, // Default limit of 50 videos
+        cacheExpirationDays: 7 // Default 1 week expiration
       });
       
       // If caching is disabled, don't cache
@@ -1187,16 +1191,130 @@ class CaptionFetcher {
         }
       }
       
+      // Add timestamp for FIFO management and expiration tracking
+      captionData.processedAt = Date.now();
+      captionData.cachedAt = Date.now(); // Additional timestamp for ordering
+      captionData.expirationDays = settings.cacheExpirationDays; // Store expiration setting with cache
+      
+      // Get video title from YouTube page
+      try {
+        if (window.seekSpeakInjector && window.seekSpeakInjector.extractVideoTitle) {
+          captionData.videoTitle = window.seekSpeakInjector.extractVideoTitle();
+        } else {
+          // Fallback title extraction
+          captionData.videoTitle = this.extractVideoTitleFallback();
+        }
+        console.log('SeekSpeak: Video title for cache:', captionData.videoTitle);
+      } catch (error) {
+        console.warn('SeekSpeak: Could not extract video title:', error);
+        captionData.videoTitle = `Video ${videoId}`;
+      }
+      
+      // Enforce cache limit using FIFO (First In, First Out)
+      await this.enforceCacheLimit(videoId, settings.maxCachedVideos);
+      
       // Cache both in memory and storage
       await chrome.storage.local.set({
         [`captions_${videoId}`]: captionData
       });
       this.captionCache.set(videoId, captionData);
-      console.log('SeekSpeak: Captions cached for', videoId);
+      
+      if (settings.cacheExpirationDays === 'never') {
+        console.log('SeekSpeak: Captions cached for', videoId, '(never expires)');
+      } else {
+        console.log('SeekSpeak: Captions cached for', videoId, `(expires in ${settings.cacheExpirationDays} days)`);
+      }
     } catch (error) {
-      console.warn('SeekSpeak: Error caching captions:', error);
+      if (error.message.includes('Extension context invalidated')) {
+        console.warn('SeekSpeak: Extension context invalidated during caching - likely fresh install');
+      } else {
+        console.warn('SeekSpeak: Error caching captions:', error);
+      }
       // Still cache in memory even if storage fails
       this.captionCache.set(videoId, captionData);
+    }
+  }
+
+  extractVideoTitleFallback() {
+    // Fallback title extraction if injector not available
+    const titleSelectors = [
+      'h1.ytd-watch-metadata yt-formatted-string',
+      'h1.title.style-scope.ytd-video-primary-info-renderer',
+      'h1.style-scope.ytd-watch-metadata',
+      '.ytd-watch-metadata h1',
+      '#container h1'
+    ];
+    
+    for (const selector of titleSelectors) {
+      const titleElement = document.querySelector(selector);
+      if (titleElement && titleElement.textContent.trim()) {
+        return titleElement.textContent.trim();
+      }
+    }
+    
+    // Fallback to page title
+    const pageTitle = document.title;
+    if (pageTitle && pageTitle !== 'YouTube') {
+      // Remove " - YouTube" suffix if present
+      return pageTitle.replace(/ - YouTube$/, '').trim();
+    }
+    
+    return 'YouTube Video';
+  }
+
+  async enforceCacheLimit(newVideoId, maxCachedVideos) {
+    try {
+      // Get all cached captions
+      const allData = await chrome.storage.local.get(null);
+      const cachedVideos = Object.keys(allData)
+        .filter(key => key.startsWith('captions_'))
+        .map(key => ({
+          key: key,
+          videoId: key.replace('captions_', ''),
+          data: allData[key]
+        }))
+        .filter(item => item.data && item.data.cachedAt); // Only items with timestamp
+      
+      console.log(`SeekSpeak: Current cache has ${cachedVideos.length} videos, limit is ${maxCachedVideos}`);
+      
+      // Check if the video we're about to add is already cached
+      const isAlreadyCached = cachedVideos.some(video => video.videoId === newVideoId);
+      
+      // Calculate future count: only add 1 if it's a new video
+      const futureCount = isAlreadyCached ? cachedVideos.length : cachedVideos.length + 1;
+      
+      console.log(`SeekSpeak: Future count will be ${futureCount} (isAlreadyCached: ${isAlreadyCached})`);
+      
+      if (futureCount > maxCachedVideos) {
+        // Sort by cachedAt timestamp (oldest first)
+        cachedVideos.sort((a, b) => a.data.cachedAt - b.data.cachedAt);
+        
+        // Calculate how many to remove to stay at limit
+        const videosToRemove = futureCount - maxCachedVideos;
+        
+        // If we're updating an existing video, don't remove it from the removal list
+        let toRemove = cachedVideos.slice(0, videosToRemove);
+        if (isAlreadyCached) {
+          toRemove = toRemove.filter(video => video.videoId !== newVideoId);
+        }
+        
+        if (toRemove.length > 0) {
+          const keysToRemove = toRemove.map(item => item.key);
+          await chrome.storage.local.remove(keysToRemove);
+          
+          // Also remove from memory cache
+          toRemove.forEach(item => {
+            this.captionCache.delete(item.videoId);
+          });
+          
+          console.log(`SeekSpeak: Removed ${toRemove.length} oldest cached videos to enforce limit of ${maxCachedVideos}`);
+          console.log('SeekSpeak: Removed videos:', toRemove.map(item => item.videoId));
+        }
+      } else {
+        console.log(`SeekSpeak: Cache limit OK - will have ${futureCount} videos after adding (limit: ${maxCachedVideos})`);
+      }
+    } catch (error) {
+      console.warn('SeekSpeak: Error enforcing cache limit:', error);
     }
   }
 

@@ -24,7 +24,7 @@ class UIController {
     this.setupThemeDetection();
     
     // Set up global keyboard shortcuts
-    this.setupGlobalKeyboardEvents();
+    await this.setupGlobalKeyboardEvents();
     
     // Wait for captions to be ready
     await this.waitForCaptions();
@@ -224,14 +224,109 @@ class UIController {
     });
   }
 
-  setupGlobalKeyboardEvents() {
-    document.addEventListener('keydown', (e) => {
-      // Global shortcut: Ctrl+Shift+F (or Cmd+Shift+F on Mac)
-      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'F') {
+  async setupGlobalKeyboardEvents() {
+    // Get user's custom keyboard shortcut with error handling
+    let settings;
+    try {
+      settings = await chrome.storage.sync.get({
+        searchShortcut: 'Ctrl+Shift+F' // Default shortcut
+      });
+    } catch (error) {
+      console.warn('SeekSpeak: Could not load keyboard settings, using default:', error);
+      settings = { searchShortcut: 'Ctrl+Shift+F' };
+    }
+
+    console.log('SeekSpeak: Setting up keyboard shortcut:', settings.searchShortcut);
+
+    // Store the current shortcut
+    this.currentShortcut = settings.searchShortcut;
+
+    // Set up unified keyboard handler
+    this.keyboardHandler = (e) => {
+      // Skip if no shortcut set
+      if (!this.currentShortcut) {
+        console.log('SeekSpeak: No shortcut set, ignoring keydown');
+        return;
+      }
+
+      // Skip if user is typing in an input field (BUT allow shortcuts in our own search input)
+      const activeElement = document.activeElement;
+      if (activeElement && (
+        activeElement.tagName === 'INPUT' || 
+        activeElement.tagName === 'TEXTAREA' ||
+        activeElement.contentEditable === 'true'
+      )) {
+        // EXCEPTION: Allow shortcuts to work in our own search input (for closing overlay)
+        const isOurSearchInput = activeElement.classList.contains('seekspeak-input') ||
+                                activeElement.closest('#seekspeak-root');
+        
+        if (!isOurSearchInput) {
+          console.log('SeekSpeak: User typing in external input field, ignoring shortcut');
+          return;
+        } else {
+          console.log('SeekSpeak: Shortcut triggered in our search input - allowing to close overlay');
+        }
+      }
+
+      // Parse the custom shortcut
+      const shortcutParts = this.currentShortcut.split('+');
+      const modifiers = shortcutParts.slice(0, -1).map(m => m.toLowerCase());
+      const key = shortcutParts[shortcutParts.length - 1];
+
+      // Check if the pressed combination matches the custom shortcut
+      let matches = true;
+
+      // Check modifiers
+      if (modifiers.includes('ctrl') && !e.ctrlKey) matches = false;
+      if (modifiers.includes('cmd') && !e.metaKey) matches = false;
+      if (modifiers.includes('alt') && !e.altKey) matches = false;
+      if (modifiers.includes('shift') && !e.shiftKey) matches = false;
+
+      // Check main key (case-insensitive)
+      let eventKey = e.key;
+      if (eventKey === ' ') eventKey = 'Space'; // Handle space key
+      if (eventKey.toLowerCase() !== key.toLowerCase()) matches = false;
+
+      // Ensure we're not missing any modifiers that are pressed
+      if (e.ctrlKey && !modifiers.includes('ctrl')) matches = false;
+      if (e.metaKey && !modifiers.includes('cmd')) matches = false;
+      if (e.altKey && !modifiers.includes('alt')) matches = false;
+      if (e.shiftKey && !modifiers.includes('shift')) matches = false;
+
+      if (matches) {
         e.preventDefault();
+        e.stopPropagation();
+        console.log('SeekSpeak: Keyboard shortcut triggered:', this.currentShortcut, 'Current overlay state:', this.isVisible);
         this.toggleSearchOverlay();
       }
-    });
+    };
+
+    // Add keyboard listener
+    document.addEventListener('keydown', this.keyboardHandler, true); // Use capture phase
+    console.log('SeekSpeak: Keyboard event listener added');
+
+    // Listen for settings updates to refresh shortcut with error handling
+    this.messageHandler = (message, sender, sendResponse) => {
+      // Handle settings updates
+      if (message.type === 'SETTINGS_UPDATED' && message.settings.searchShortcut) {
+        console.log('SeekSpeak: Updating keyboard shortcut to:', message.settings.searchShortcut);
+        this.currentShortcut = message.settings.searchShortcut;
+      }
+      
+      // Handle other UI messages
+      this.handleMessage(message, sender, sendResponse);
+    };
+    
+    try {
+      if (chrome && chrome.runtime && chrome.runtime.onMessage) {
+        chrome.runtime.onMessage.addListener(this.messageHandler);
+        console.log('SeekSpeak: Message listener added for settings updates');
+      } else {
+        console.warn('SeekSpeak: Chrome runtime not available, settings updates may not work');
+      }
+    } catch (error) {
+      console.warn('SeekSpeak: Could not add message listener:', error);
+    }
   }
 
   setupThemeDetection() {
@@ -298,7 +393,7 @@ class UIController {
     this.selectedResultIndex = -1;
     this.currentResults = [];
     
-    console.log('SeekSpeak: Search overlay shown');
+    console.log('SeekSpeak: Search overlay shown, state:', this.isVisible);
   }
 
   hideSearchOverlay() {
@@ -311,16 +406,20 @@ class UIController {
       input.value = '';
       this.clearResults();
       
-      console.log('SeekSpeak: Search overlay hidden');
+      console.log('SeekSpeak: Search overlay hidden, state:', this.isVisible);
     }
   }
 
   toggleSearchOverlay() {
+    console.log('SeekSpeak: Toggle requested, current state:', this.isVisible);
+    
     if (this.isVisible) {
       this.hideSearchOverlay();
     } else {
       this.showSearchOverlay();
     }
+    
+    console.log('SeekSpeak: Toggle completed, new state:', this.isVisible);
   }
 
   async performSearch(query) {
@@ -602,13 +701,23 @@ class UIController {
   }
 
   handleMessage(message, sender, sendResponse) {
+    console.log('SeekSpeak: UI Controller received message:', message.type, 'Current overlay state:', this.isVisible);
+    
     switch (message.type) {
       case 'OPEN_SEARCH':
-        this.showSearchOverlay();
+        // Chrome Commands API sends this - but we want toggle behavior
+        this.toggleSearchOverlay();
         break;
         
       case 'CLOSE_SEARCH':
         this.hideSearchOverlay();
+        break;
+        
+      case 'SETTINGS_UPDATED':
+        if (message.settings.searchShortcut) {
+          console.log('SeekSpeak: Updating keyboard shortcut via message to:', message.settings.searchShortcut);
+          this.currentShortcut = message.settings.searchShortcut;
+        }
         break;
         
       default:
@@ -618,6 +727,19 @@ class UIController {
   }
 
   cleanup() {
+    // Remove keyboard event listener
+    if (this.keyboardHandler) {
+      document.removeEventListener('keydown', this.keyboardHandler, true);
+      this.keyboardHandler = null;
+    }
+    
+    // Remove message listener
+    if (this.messageHandler) {
+      chrome.runtime.onMessage.removeListener(this.messageHandler);
+      this.messageHandler = null;
+    }
+    
+    // Remove overlay
     if (this.overlay) {
       this.overlay.remove();
       this.overlay = null;
@@ -631,6 +753,8 @@ class UIController {
       clearTimeout(this.searchTimeout);
       this.searchTimeout = null;
     }
+    
+    console.log('SeekSpeak: UI Controller cleaned up');
   }
 }
 

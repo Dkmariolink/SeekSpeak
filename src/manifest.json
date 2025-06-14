@@ -6,8 +6,9 @@
   
   "permissions": [
     "activeTab",
-    "storage",
-    "scripting"
+    "storage", 
+    "scripting",
+    "tabs"
   ],
   
   "host_permissions": [
@@ -32,7 +33,7 @@
       "css": [
         "content/seekspeak.css"
       ],
-      "run_at": "document_start",
+      "run_at": "document_idle",
       "all_frames": false
     }
   ],
@@ -61,16 +62,6 @@
   
   "options_page": "options/options.html",
 
-  "commands": {
-    "open-search": {
-      "suggested_key": {
-        "default": "Ctrl+Shift+F",
-        "mac": "Command+Shift+F"
-      },
-      "description": "Open caption search"
-    }
-  },
-  
   "web_accessible_resources": [
     {
       "resources": [

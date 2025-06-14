@@ -14,110 +14,131 @@ class SeekSpeakCustomUI {
   injectStyles() {
     if (document.getElementById('seekspeak-button-styles')) return;
 
-    const style = document.createElement('style');
-    style.id = 'seekspeak-button-styles';
-    style.textContent = `
-      .seekspeak-button {
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
-        background: var(--yt-spec-button-chip-background-hover);
-        color: var(--yt-spec-text-primary);
-        border: 1px solid var(--yt-spec-10-percent-layer);
-        padding: 8px 16px;
-        border-radius: 18px;
-        font-size: 14px;
-        font-weight: 500;
-        cursor: pointer;
-        margin-left: 12px;
-        transition: all 0.1s ease;
-        font-family: "Roboto", "Arial", sans-serif;
-        height: 36px;
-        min-width: 140px;
-        justify-content: center;
-        box-sizing: border-box;
+    // Wait for document head to be ready
+    const injectWhenReady = () => {
+      if (!document.head) {
+        setTimeout(injectWhenReady, 100);
+        return;
       }
 
-      .seekspeak-button:hover:not(.loading):not(.disabled) {
-        background: var(--yt-spec-button-chip-background-hover);
-        border-color: var(--yt-spec-call-to-action);
-      }
-
-      .seekspeak-button.disabled {
-        background: var(--yt-spec-button-chip-background-disabled);
-        color: var(--yt-spec-text-disabled);
-        border-color: var(--yt-spec-10-percent-layer);
-        cursor: not-allowed;
-        opacity: 0.6;
-      }
-
-      .seekspeak-button.loading {
-        background: var(--yt-spec-button-chip-background-hover);
-        color: var(--yt-spec-text-secondary);
-        cursor: not-allowed;
-        pointer-events: none;
-      }
-
-      .seekspeak-icon {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        width: 18px;
-        height: 18px;
-        border-radius: 3px;
-        line-height: 1;
-      }
-
-      .seekspeak-icon img {
-        width: 16px;
-        height: 16px;
-        border-radius: 2px;
-      }
-
-      .seekspeak-button.disabled .seekspeak-icon {
-        opacity: 0.5;
-      }
-
-      .seekspeak-button.loading .seekspeak-icon {
-        animation: seekspeak-pulse 1.2s ease-in-out infinite;
-      }
-
-      @keyframes seekspeak-pulse {
-        0%, 100% { 
-          opacity: 1;
-          transform: scale(1);
+      const style = document.createElement('style');
+      style.id = 'seekspeak-button-styles';
+      style.textContent = `
+        .seekspeak-button {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          background: var(--yt-spec-button-chip-background-hover);
+          color: var(--yt-spec-text-primary);
+          border: 1px solid var(--yt-spec-10-percent-layer);
+          padding: 8px 16px;
+          border-radius: 18px;
+          font-size: 14px;
+          font-weight: 500;
+          cursor: pointer;
+          margin-left: 12px;
+          transition: all 0.1s ease;
+          font-family: "Roboto", "Arial", sans-serif;
+          height: 36px;
+          min-width: 140px;
+          justify-content: center;
+          box-sizing: border-box;
         }
-        50% { 
+
+        .seekspeak-button:hover:not(.loading):not(.disabled) {
+          background: var(--yt-spec-button-chip-background-hover);
+          border-color: var(--yt-spec-call-to-action);
+        }
+
+        .seekspeak-button.disabled {
+          background: var(--yt-spec-button-chip-background-disabled);
+          color: var(--yt-spec-text-disabled);
+          border-color: var(--yt-spec-10-percent-layer);
+          cursor: not-allowed;
           opacity: 0.6;
-          transform: scale(1.1);
         }
-      }
 
-      /* Loading dots animation - prevent layout shift */
-      .seekspeak-loading-dots {
-        display: inline-block;
-        min-width: 18px; /* Space for "..." */
-        text-align: left;
-      }
+        .seekspeak-button.loading {
+          background: var(--yt-spec-button-chip-background-hover);
+          color: var(--yt-spec-text-secondary);
+          cursor: not-allowed;
+          pointer-events: none;
+        }
 
-      .seekspeak-loading-dots::after {
-        content: '';
-        animation: seekspeak-dots 1.5s infinite;
-      }
+        .seekspeak-icon {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          width: 18px;
+          height: 18px;
+          border-radius: 3px;
+          line-height: 1;
+        }
 
-      @keyframes seekspeak-dots {
-        0%, 20% { content: ''; }
-        25%, 45% { content: '.'; }
-        50%, 70% { content: '..'; }
-        75%, 95% { content: '...'; }
-      }
+        .seekspeak-icon img {
+          width: 16px;
+          height: 16px;
+          border-radius: 2px;
+        }
 
-      /* Ensure proper flex layout with subscribe button */
-      ytd-subscribe-button-renderer {
-        margin-right: 0 !important;
+        .seekspeak-button.disabled .seekspeak-icon {
+          opacity: 0.5;
+        }
+
+        .seekspeak-button.loading .seekspeak-icon {
+          animation: seekspeak-pulse 1.2s ease-in-out infinite;
+        }
+
+        @keyframes seekspeak-pulse {
+          0%, 100% { 
+            opacity: 1;
+            transform: scale(1);
+          }
+          50% { 
+            opacity: 0.6;
+            transform: scale(1.1);
+          }
+        }
+
+        /* Loading dots animation - prevent layout shift */
+        .seekspeak-loading-dots {
+          display: inline-block;
+          min-width: 18px; /* Space for "..." */
+          text-align: left;
+        }
+
+        .seekspeak-loading-dots::after {
+          content: '';
+          animation: seekspeak-dots 1.5s infinite;
+        }
+
+        @keyframes seekspeak-dots {
+          0%, 20% { content: ''; }
+          25%, 45% { content: '.'; }
+          50%, 70% { content: '..'; }
+          75%, 95% { content: '...'; }
+        }
+
+        /* Ensure proper flex layout with subscribe button */
+        ytd-subscribe-button-renderer {
+          margin-right: 0 !important;
+        }
+      `;
+
+      // Safely append to head with error handling
+      try {
+        if (document.head) {
+          document.head.appendChild(style);
+          console.log('SeekSpeak: Button styles injected successfully');
+        } else {
+          console.error('SeekSpeak: document.head is still null, cannot inject styles');
+        }
+      } catch (error) {
+        console.error('SeekSpeak: Error injecting button styles:', error);
       }
-    `;
-    document.head.appendChild(style);
+    };
+    
+    injectWhenReady();
   }
 
   createButton() {
@@ -382,6 +403,23 @@ class SeekSpeakCustomUI {
     // Create button
     this.createButton();
     
+    // Listen for badge status updates to sync button state with proper error handling
+    try {
+      if (chrome && chrome.runtime && chrome.runtime.onMessage) {
+        chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+          if (message.type === 'BADGE_STATUS_UPDATE') {
+            console.log('SeekSpeak: Received badge status update:', message.status);
+            this.syncButtonWithBadgeStatus(message.status);
+          }
+        });
+        console.log('SeekSpeak: Badge status listener registered successfully');
+      } else {
+        console.warn('SeekSpeak: Chrome runtime not available for badge sync');
+      }
+    } catch (error) {
+      console.error('SeekSpeak: Error setting up badge status listener:', error);
+    }
+    
     // Re-add button on navigation with proper cleanup
     document.addEventListener('yt-navigate-finish', () => {
       setTimeout(() => {
@@ -401,6 +439,25 @@ class SeekSpeakCustomUI {
         this.createButton();
       }, 1000);
     });
+  }
+
+  syncButtonWithBadgeStatus(badgeStatus) {
+    console.log('SeekSpeak: Syncing button with badge status:', badgeStatus);
+    
+    switch (badgeStatus) {
+      case 'loading':
+        this.updateButtonState('loading');
+        break;
+      case 'found':
+        this.updateButtonState('ready');
+        break;
+      case 'error':
+        this.updateButtonState('disabled', 'No Captions');
+        break;
+      case 'ready':
+        // Don't change button state on 'ready' - let normal flow handle it
+        break;
+    }
   }
 
   // Methods for compatibility with caption fetcher
