@@ -123,6 +123,18 @@ body {
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
 }
 
+.action-button.primary.retry {
+  background: #ff9800;
+  color: white;
+  font-weight: 600;
+}
+
+.action-button.primary.retry:hover {
+  background: #f57c00;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(255, 152, 0, 0.3);
+}
+
 .button-icon {
   font-size: 16px;
 }

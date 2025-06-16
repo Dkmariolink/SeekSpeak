@@ -1,6 +1,6 @@
 /**
  * SeekSpeak Popup Script
- * Handles the extension popup interface
+ * Handles the extension popup interface with robust communication
  */
 
 class PopupController {
@@ -8,6 +8,9 @@ class PopupController {
     this.currentTab = null;
     this.videoInfo = null;
     this.isYouTubeVideo = false;
+    this.retryCount = 0;
+    this.maxRetries = 5;
+    this.retryDelay = 500; // ms
     
     this.elements = {
       statusIcon: document.getElementById('status-icon'),
@@ -111,13 +114,105 @@ class PopupController {
         return;
       }
 
-      // It's a YouTube video, get more info
-      await this.getVideoInfo();
+      // It's a YouTube video, verify content scripts are loaded
+      await this.verifyContentScriptsLoaded();
       
     } catch (error) {
       console.error('SeekSpeak Popup: Error checking tab:', error);
       this.setStatus('error', 'Error accessing current tab');
     }
+  }
+
+  async verifyContentScriptsLoaded() {
+    try {
+      this.setStatus('loading', 'Checking extension status...');
+      
+      // Try to ping content scripts with retry logic
+      const isLoaded = await this.pingContentScripts();
+      
+      if (isLoaded) {
+        console.log('SeekSpeak Popup: Content scripts are loaded and ready');
+        await this.getVideoInfo();
+      } else {
+        console.warn('SeekSpeak Popup: Content scripts not responding after retries');
+        
+        // Check if we're on a YouTube video page at all
+        if (this.isYouTubeVideo) {
+          this.setStatus('warning', 'Extension not fully loaded');
+          this.elements.captionStatus.textContent = 'Try refreshing the page';
+          document.getElementById('troubleshoot').style.display = 'block';
+        } else {
+          this.setStatus('info', 'Open a YouTube video to search captions');
+          this.elements.captionStatus.textContent = '';
+        }
+        
+        // Enable retry button
+        this.enableRetryButton();
+      }
+    } catch (error) {
+      console.error('SeekSpeak Popup: Error verifying content scripts:', error);
+      this.setStatus('error', 'Extension verification failed');
+    }
+  }
+
+  async pingContentScripts(retryCount = 0) {
+    try {
+      console.log(`SeekSpeak Popup: Pinging content scripts (attempt ${retryCount + 1}/${this.maxRetries})`);
+      
+      const response = await this.sendMessageWithTimeout(
+        { type: 'PING' },
+        1000 // 1 second timeout per attempt
+      );
+      
+      if (response && response.pong) {
+        return true;
+      }
+    } catch (error) {
+      console.warn(`SeekSpeak Popup: Ping attempt ${retryCount + 1} failed:`, error.message);
+    }
+    
+    // Retry if failed and haven't exceeded max retries
+    if (retryCount < this.maxRetries - 1) {
+      await new Promise(resolve => setTimeout(resolve, this.retryDelay));
+      return this.pingContentScripts(retryCount + 1);
+    }
+    
+    return false;
+  }
+
+  async sendMessageWithTimeout(message, timeout = 2000) {
+    return new Promise((resolve, reject) => {
+      // Track if we've already responded
+      let responded = false;
+      
+      const timeoutId = setTimeout(() => {
+        if (!responded) {
+          responded = true;
+          reject(new Error('Message timeout'));
+        }
+      }, timeout);
+      
+      try {
+        chrome.tabs.sendMessage(this.currentTab.id, message, (response) => {
+          if (!responded) {
+            responded = true;
+            clearTimeout(timeoutId);
+            
+            if (chrome.runtime.lastError) {
+              reject(new Error(chrome.runtime.lastError.message));
+            } else {
+              resolve(response || {});
+            }
+          }
+        });
+      } catch (error) {
+        if (!responded) {
+          responded = true;
+          clearTimeout(timeoutId);
+          reject(error);
+        }
+      }
+    });
   }
 
   isYouTubeVideoUrl(url) {
@@ -135,8 +230,8 @@ class PopupController {
     try {
       this.setStatus('loading', 'Checking video captions...');
       
-      // Send message to content script to get video info
-      const response = await chrome.tabs.sendMessage(this.currentTab.id, {
+      // Send message to content script to get video info with retry
+      const response = await this.sendMessageWithRetry({
         type: 'GET_CURRENT_VIDEO'
       });
       
@@ -152,6 +247,7 @@ class PopupController {
         
       } else {
         this.setStatus('warning', 'Video information not available');
+        this.enableRetryButton();
       }
       
     } catch (error) {
@@ -161,42 +257,42 @@ class PopupController {
       if (error.message && error.message.includes('Could not establish connection')) {
         this.setStatus('error', 'Extension not loaded on this page');
         this.elements.captionStatus.textContent = 'Try refreshing the page';
-        // Show troubleshooting section
         document.getElementById('troubleshoot').style.display = 'block';
       } else {
-        this.setStatus('error', 'Extension not active');
-        this.elements.captionStatus.textContent = 'Extension not active';
+        this.setStatus('error', 'Extension communication failed');
+        this.elements.captionStatus.textContent = 'Click to retry';
       }
+      
+      this.enableRetryButton();
+    }
+  }
+
+  async sendMessageWithRetry(message, retryCount = 0) {
+    try {
+      console.log(`SeekSpeak Popup: Sending message ${message.type} (attempt ${retryCount + 1})`);
+      
+      const response = await this.sendMessageWithTimeout(message, 2000);
+      return response;
+      
+    } catch (error) {
+      console.warn(`SeekSpeak Popup: Message ${message.type} failed:`, error.message);
+      
+      if (retryCount < this.maxRetries - 1) {
+        await new Promise(resolve => setTimeout(resolve, this.retryDelay));
+        return this.sendMessageWithRetry(message, retryCount + 1);
+      }
+      
+      throw error;
     }
   }
 
   async checkCaptionAvailability() {
     try {
-      // Check caption status directly from content script
-      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-      
-      if (!tab) {
-        this.setStatus('warning', 'No active tab found');
-        return;
-      }
-
-      // Execute script in content context to check UI controller
-      const results = await chrome.scripting.executeScript({
-        target: { tabId: tab.id },
-        func: () => {
-          // Check if UI controller is available and get caption status
-          if (window.uiController && typeof window.uiController.getCaptionStatus === 'function') {
-            const status = window.uiController.getCaptionStatus();
-            console.log('SeekSpeak Popup: Caption status from UI controller:', status);
-            return status;
-          } else {
-            console.log('SeekSpeak Popup: UI controller not available');
-            return { available: false, source: null, segmentCount: 0, error: 'UI controller not found' };
-          }
-        }
+      // Request caption status through message passing (not executeScript)
+      const captionStatus = await this.sendMessageWithRetry({
+        type: 'GET_CAPTION_STATUS'
       });
-
-      const captionStatus = results && results[0] && results[0].result;
+      
       console.log('SeekSpeak Popup: Received caption status:', captionStatus);
 
       if (captionStatus && captionStatus.available) {
@@ -204,17 +300,34 @@ class PopupController {
         this.elements.captionStatus.textContent = `${captionStatus.segmentCount} caption segments found`;
         this.enableSearchButton();
         
+      } else if (captionStatus && captionStatus.loading) {
+        this.setStatus('loading', 'Loading captions...');
+        this.elements.captionStatus.textContent = 'Please wait...';
+        
+        // Check again after a delay
+        setTimeout(() => this.checkCaptionAvailability(), 2000);
+        
+      } else if (captionStatus && captionStatus.noCaptions) {
+        // Definitively no captions available
+        this.setStatus('warning', 'No captions available');
+        this.elements.captionStatus.textContent = 'This video has no captions';
+        this.disableSearchButton();
+        // Don't show retry for videos without captions
+        
       } else {
         this.setStatus('warning', 'No captions available for this video');
         this.elements.captionStatus.textContent = 'No captions found';
         this.disableSearchButton();
+        
+        // Still enable retry in case captions load later
+        this.enableRetryButton();
       }
       
     } catch (error) {
       console.error('SeekSpeak Popup: Error checking captions:', error);
       this.setStatus('warning', 'Cannot check caption status');
       this.elements.captionStatus.textContent = 'Status unknown';
-      this.disableSearchButton();
+      this.enableRetryButton();
     }
   }
 
@@ -243,11 +356,41 @@ class PopupController {
   enableSearchButton() {
     this.elements.searchButton.disabled = false;
     this.elements.searchButton.classList.add('enabled');
+    this.elements.searchButton.classList.remove('retry');
+    this.elements.searchButton.querySelector('.button-text').textContent = 'Search Captions';
   }
 
   disableSearchButton() {
     this.elements.searchButton.disabled = true;
     this.elements.searchButton.classList.remove('enabled');
+    this.elements.searchButton.classList.remove('retry');
+  }
+
+  enableRetryButton() {
+    this.elements.searchButton.disabled = false;
+    this.elements.searchButton.classList.add('retry');
+    this.elements.searchButton.classList.remove('enabled');
+    const buttonText = this.elements.searchButton.querySelector('.button-text');
+    if (buttonText) {
+      buttonText.textContent = 'Retry';
+    }
+    
+    // Change click behavior to retry
+    this.elements.searchButton.onclick = () => {
+      this.retryInitialization();
+    };
+  }
+
+  async retryInitialization() {
+    console.log('SeekSpeak Popup: Retrying initialization');
+    this.retryCount = 0; // Reset retry count
+    
+    // Reset button to loading state
+    this.setStatus('loading', 'Retrying...');
+    this.disableSearchButton();
+    
+    // Re-check current tab first
+    await this.checkCurrentTab();
   }
 
   async openSearch() {
@@ -256,21 +399,16 @@ class PopupController {
     console.log('SeekSpeak Popup: videoInfo:', this.videoInfo);
     console.log('SeekSpeak Popup: currentTab:', this.currentTab);
 
-    if (!this.isYouTubeVideo || !this.videoInfo) {
-      console.log('SeekSpeak Popup: Not a YouTube video or no video info');
-      return;
-    }
-
-    if (!this.currentTab || !this.currentTab.id) {
-      console.log('SeekSpeak Popup: No current tab or tab ID');
+    if (!this.isYouTubeVideo || !this.currentTab || !this.currentTab.id) {
+      console.log('SeekSpeak Popup: Prerequisites not met');
       return;
     }
 
     try {
       console.log('SeekSpeak Popup: Sending OPEN_SEARCH message to tab:', this.currentTab.id);
       
-      // Send message to content script to open search overlay
-      await chrome.tabs.sendMessage(this.currentTab.id, {
+      // Send message to content script to open search overlay with retry
+      await this.sendMessageWithRetry({
         type: 'OPEN_SEARCH'
       });
       
@@ -281,7 +419,10 @@ class PopupController {
       
     } catch (error) {
       console.error('SeekSpeak Popup: Error opening search:', error);
-      this.setStatus('error', 'Failed to open search: ' + error.message);
+      this.setStatus('error', 'Failed to open search');
+      
+      // Enable retry
+      this.enableRetryButton();
     }
   }
 

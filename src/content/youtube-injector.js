@@ -7,6 +7,7 @@ class YouTubeInjector {
   constructor() {
     this.currentVideoId = null;
     this.isYouTubePage = false;
+    this.extensionSetup = false; // Track if extension setup has run for current video
     this.searchOverlay = null;
     
     this.init();
@@ -54,7 +55,17 @@ class YouTubeInjector {
       console.log('SeekSpeak: Video ID:', videoId);
       
       if (videoId && videoId !== this.currentVideoId) {
+        const previousVideoId = this.currentVideoId;
         this.currentVideoId = videoId;
+        this.extensionSetup = false; // Reset flag for new video
+        console.log('SeekSpeak: Video ID changed from', previousVideoId, 'to', videoId);
+        this.setupExtension();
+        this.setupMessageListeners();
+        this.extensionSetup = true;
+      } else if (videoId && !this.extensionSetup) {
+        // First time on this video and extension not yet set up
+        console.log('SeekSpeak: Setting up extension for current video:', videoId);
+        this.extensionSetup = true;
         this.setupExtension();
         this.setupMessageListeners();
       }
@@ -225,6 +236,13 @@ class YouTubeInjector {
             type: 'UPDATE_BADGE',
             status: 'warning'
           });
+          
+          // Still initialize UI controller for no-caption videos
+          if (window.uiController) {
+            console.log('SeekSpeak: Initializing UI controller (no captions)');
+            await window.uiController.init();
+          }
+          
           return false;
         }
       } else {
@@ -376,23 +394,64 @@ class YouTubeInjector {
   }
 
   setupMessageListeners() {
+    // Use a single listener to avoid conflicts
+    if (this.messageListenerSetup) {
+      console.log('SeekSpeak: Message listeners already set up');
+      return;
+    }
+    
     chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-      switch (message.type) {
-        case 'GET_CURRENT_VIDEO':
-          sendResponse({
-            videoId: this.currentVideoId,
-            url: window.location.href,
-            videoTitle: this.extractVideoTitle()
-          });
-          break;
-          
-        default:
-          // Forward other messages to UI controller
-          if (window.uiController && window.uiController.handleMessage) {
-            window.uiController.handleMessage(message, sender, sendResponse);
-          }
+      console.log('SeekSpeak: YouTubeInjector received message:', message.type);
+      
+      // Handle messages synchronously and immediately
+      try {
+        switch (message.type) {
+          case 'PING':
+            sendResponse({ pong: true });
+            break;
+            
+          case 'GET_CURRENT_VIDEO':
+            sendResponse({
+              videoId: this.currentVideoId,
+              url: window.location.href,
+              videoTitle: this.extractVideoTitle()
+            });
+            break;
+            
+          case 'GET_CAPTION_STATUS':
+            if (window.uiController && window.uiController.getCaptionStatus) {
+              const status = window.uiController.getCaptionStatus();
+              sendResponse(status);
+            } else {
+              sendResponse({ available: false, loading: true });
+            }
+            break;
+            
+          case 'OPEN_SEARCH':
+            if (window.uiController) {
+              // Use setTimeout to avoid blocking the response
+              setTimeout(() => window.uiController.showSearchOverlay(), 0);
+              sendResponse({ success: true });
+            } else {
+              sendResponse({ success: false, error: 'UI controller not ready' });
+            }
+            break;
+            
+          default:
+            sendResponse({ error: 'Unknown message type' });
+            break;
+        }
+      } catch (error) {
+        console.error('SeekSpeak: Error handling message:', error);
+        sendResponse({ error: error.message });
       }
+      
+      // Return false to indicate synchronous response
+      return false;
     });
+    
+    this.messageListenerSetup = true;
+    console.log('SeekSpeak: Message listeners set up');
   }
 
   cleanup() {
@@ -441,6 +500,13 @@ async function initializeSeekSpeak() {
       return;
     }
     
+    // Add initialization lock to prevent concurrent initialization
+    if (window.seekSpeakInitializing) {
+      console.log('SeekSpeak: Already initializing, skipping duplicate attempt');
+      return;
+    }
+    window.seekSpeakInitializing = true;
+    
     // Verify all components are loaded
     const componentsLoaded = window.chromeAPIHelper &&
                            window.captionFetcher && 
@@ -455,6 +521,9 @@ async function initializeSeekSpeak() {
       console.log('SeekSpeak: searchEngine:', !!window.searchEngine);  
       console.log('SeekSpeak: uiController:', !!window.uiController);
       console.log('SeekSpeak: seekSpeakCustomUI:', !!window.seekSpeakCustomUI);
+      
+      // Clear initialization lock
+      window.seekSpeakInitializing = false;
       
       // More aggressive retry for first-time loading
       setTimeout(() => {
@@ -482,10 +551,14 @@ async function initializeSeekSpeak() {
     
     // Mark as successfully initialized
     window.seekSpeakInitialized = true;
+    window.seekSpeakInitializing = false; // Clear initialization lock
     
   } catch (error) {
     console.error('SeekSpeak: Failed to initialize:', error);
     console.error('SeekSpeak: Error stack:', error.stack);
+    
+    // Clear initialization lock on error
+    window.seekSpeakInitializing = false;
     
     // More aggressive retry after error
     setTimeout(() => {
@@ -520,22 +593,19 @@ if (document.readyState === 'loading') {
   setTimeout(initializeSeekSpeak, 2000); // 2 second delay for fresh installs
 }
 
-// Strategy 2: More aggressive safety nets for first-time loading
-const retryIntervals = [3000, 5000, 7000, 10000]; // Longer delays for fresh installs
-retryIntervals.forEach((delay, index) => {
-  setTimeout(() => {
-    if (!window.seekSpeakInjector && window.location.href.includes('/watch')) {
-      console.log(`SeekSpeak: Safety net initialization ${index + 1} triggered (${delay}ms)`);
-      initializeSeekSpeak();
-    }
-  }, delay);
-});
+// Strategy 2: Single safety net for first-time loading
+setTimeout(() => {
+  if (!window.seekSpeakInjector && !window.seekSpeakInitializing && window.location.href.includes('/watch')) {
+    console.log('SeekSpeak: Safety net initialization triggered (5s)');
+    initializeSeekSpeak();
+  }
+}, 5000);
 
 // Strategy 3: Listen for YouTube navigation events
 document.addEventListener('yt-navigate-finish', () => {
   console.log('SeekSpeak: YouTube navigation finished, checking if initialization needed');
   setTimeout(() => {
-    if (window.location.href.includes('/watch') && !window.seekSpeakInjector) {
+    if (window.location.href.includes('/watch') && !window.seekSpeakInjector && !window.seekSpeakInitializing) {
       console.log('SeekSpeak: Post-navigation initialization triggered');
       initializeSeekSpeak();
     }
@@ -547,7 +617,7 @@ document.addEventListener('visibilitychange', () => {
   if (!document.hidden && window.location.href.includes('/watch')) {
     console.log('SeekSpeak: Page became visible, checking initialization');
     setTimeout(() => {
-      if (!window.seekSpeakInjector) {
+      if (!window.seekSpeakInjector && !window.seekSpeakInitializing) {
         console.log('SeekSpeak: Visibility-based initialization triggered');
         initializeSeekSpeak();
       }
@@ -555,23 +625,16 @@ document.addEventListener('visibilitychange', () => {
   }
 });
 
-// Strategy 5: Focus event detection (for new tabs and window switching)
-window.addEventListener('focus', () => {
-  if (window.location.href.includes('/watch') && !window.seekSpeakInjector) {
-    console.log('SeekSpeak: Window focus initialization triggered');
-    setTimeout(initializeSeekSpeak, 100);
-  }
-});
-
-// Strategy 6: NEW - MutationObserver for DOM changes (detect when YouTube fully loads)
+// Strategy 5: MutationObserver for DOM changes (detect when YouTube fully loads)
 const initObserver = new MutationObserver((mutations) => {
-  if (!window.seekSpeakInjector && window.location.href.includes('/watch')) {
+  if (!window.seekSpeakInjector && !window.seekSpeakInitializing && window.location.href.includes('/watch')) {
     // Check if critical YouTube elements are now present
     const playerElement = document.getElementById('movie_player');
     const subscribeButton = document.querySelector('ytd-subscribe-button-renderer');
     
     if (playerElement && subscribeButton) {
       console.log('SeekSpeak: YouTube player and UI detected via MutationObserver');
+      initObserver.disconnect(); // Stop observing once we initialize
       setTimeout(initializeSeekSpeak, 200);
     }
   }

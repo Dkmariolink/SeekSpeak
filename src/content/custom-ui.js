@@ -312,8 +312,9 @@ class SeekSpeakCustomUI {
   // Start the caption fetching process with loading state
   startCaptionFetching() {
     if (this.isLoading) {
-      console.log('SeekSpeak: Already loading captions');
-      return;
+      console.log('SeekSpeak: Already loading captions - resetting loading state');
+      this.isLoading = false; // Reset stuck loading state
+      // Don't return, continue with fresh attempt
     }
 
     // Don't start if extension isn't ready
@@ -323,12 +324,29 @@ class SeekSpeakCustomUI {
       return;
     }
 
+    // Check if youtube-injector is already processing captions (not just tracking video ID)
+    const videoId = this.extractVideoId();
+    if (window.seekSpeakInjector && window.seekSpeakInjector.currentVideoId === videoId) {
+      // Check if captions are actually being processed or are ready
+      if (window.uiController && window.uiController.getCaptionStatus) {
+        const status = window.uiController.getCaptionStatus();
+        if (status && (status.available || status.loading)) {
+          console.log('SeekSpeak: YouTube injector handling this video and captions are available/loading');
+          setTimeout(() => this.checkExistingCaptions(), 2000);
+          return;
+        }
+      }
+      console.log('SeekSpeak: YouTube injector tracking video but captions not processing yet - proceeding with custom UI fetch');
+    }
+
+    this.isLoading = true; // Set loading flag
     this.updateButtonState('loading');
     
     // Add a timeout to prevent infinite loading (30 seconds)
     const loadingTimeout = setTimeout(() => {
       if (this.isLoading) {
         console.warn('SeekSpeak: Loading timeout reached, showing retry option');
+        this.isLoading = false; // Clear loading flag
         this.updateButtonState('retry', 'Retry');
       }
     }, 30000);
@@ -345,6 +363,7 @@ class SeekSpeakCustomUI {
         this.checkInterval = null;
         clearTimeout(loadingTimeout);
         if (this.isLoading) {
+          this.isLoading = false; // Clear loading flag
           this.updateButtonState('retry', 'Retry');
         }
       }
@@ -353,40 +372,68 @@ class SeekSpeakCustomUI {
     // Try to trigger caption loading
     if (window.captionFetcher && window.captionFetcher.init) {
       const videoId = this.extractVideoId();
+      console.log('SeekSpeak: DEBUG - Extracted video ID:', videoId, 'from URL:', window.location.href);
+      
       if (videoId) {
         console.log('SeekSpeak: Starting caption fetch for video:', videoId);
         
-        window.captionFetcher.init(videoId).then((result) => {
-          clearTimeout(loadingTimeout);
-          if (this.checkInterval) {
-            clearInterval(this.checkInterval);
-            this.checkInterval = null;
-          }
+        window.captionFetcher.init(videoId).then(async (result) => {
+          console.log('SeekSpeak: Caption fetch completed with result:', result);
           
-          if (result && result.segments && result.segments.length > 4) { // Real captions
-            console.log('SeekSpeak: Captions loaded successfully');
-            this.updateButtonState('ready');
+          if (result && result.segments && result.segments.length > 0) {
+            console.log('SeekSpeak: Captions loaded successfully, count:', result.segments.length);
+            
+            // Build search index with the caption data
+            if (window.searchEngine) {
+              console.log('SeekSpeak: Building search index for', result.segments.length, 'segments');
+              try {
+                const indexBuilt = await window.searchEngine.buildIndex(result);
+                if (indexBuilt) {
+                  console.log('SeekSpeak: Search index built successfully');
+                  this.updateButtonState('ready');
+                } else {
+                  console.warn('SeekSpeak: Failed to build search index');
+                  this.updateButtonState('retry', 'Retry');
+                }
+              } catch (indexError) {
+                console.error('SeekSpeak: Error building search index:', indexError);
+                this.updateButtonState('retry', 'Retry');
+              }
+            } else {
+              console.error('SeekSpeak: Search engine not available');
+              this.updateButtonState('retry', 'Retry');
+            }
           } else {
             console.log('SeekSpeak: No captions available for this video');
             this.updateButtonState('disabled', 'No Captions');
           }
-        }).catch((error) => {
+          
+          this.isLoading = false; // Clear loading flag
           clearTimeout(loadingTimeout);
           if (this.checkInterval) {
             clearInterval(this.checkInterval);
             this.checkInterval = null;
           }
-          console.error('SeekSpeak: Error loading captions:', error);
+        }).catch((error) => {
+          console.error('SeekSpeak: Caption fetch failed with error:', error);
+          this.isLoading = false; // Clear loading flag
+          clearTimeout(loadingTimeout);
+          if (this.checkInterval) {
+            clearInterval(this.checkInterval);
+            this.checkInterval = null;
+          }
           this.updateButtonState('retry', 'Retry');
         });
       } else {
+        console.error('SeekSpeak: Could not extract video ID from URL:', window.location.href);
+        this.isLoading = false; // Clear loading flag
         clearTimeout(loadingTimeout);
-        console.error('SeekSpeak: Could not extract video ID');
         this.updateButtonState('disabled', 'No Video');
       }
     } else {
+      console.error('SeekSpeak: CaptionFetcher not available - window.captionFetcher:', !!window.captionFetcher);
+      this.isLoading = false; // Clear loading flag
       clearTimeout(loadingTimeout);
-      console.error('SeekSpeak: CaptionFetcher not available');
       this.updateButtonState('retry', 'Retry');
     }
   }
@@ -517,6 +564,9 @@ class SeekSpeakCustomUI {
     // Set up automatic retry when extension becomes ready
     this.setupExtensionReadyListener();
     
+    // Set up observer to watch for subscribe button appearing
+    this.setupSubscribeButtonObserver();
+    
     // Listen for badge status updates to sync button state with proper error handling
     try {
       if (chrome && chrome.runtime && chrome.runtime.onMessage) {
@@ -565,14 +615,29 @@ class SeekSpeakCustomUI {
       }
     }, 2000);
     
+    // Also check if button needs to be created (for first video load)
+    const buttonCheckInterval = setInterval(() => {
+      if (!this.button) {
+        console.log('SeekSpeak: Button missing, attempting to create...');
+        this.createButtonWithRetry();
+      }
+    }, 3000);
+    
     // Stop checking after 2 minutes
     setTimeout(() => {
       clearInterval(readyCheckInterval);
+      clearInterval(buttonCheckInterval);
     }, 120000);
   }
 
   async createButtonWithRetry() {
-    const maxAttempts = 10; // Try for up to 10 seconds
+    // Skip if button already exists
+    if (this.button) {
+      console.log('SeekSpeak: Button already exists, skipping retry');
+      return true;
+    }
+    
+    const maxAttempts = 15; // Try for up to 30 seconds (15 attempts * 2 second intervals)
     let attempt = 0;
     
     while (attempt < maxAttempts) {
@@ -587,12 +652,53 @@ class SeekSpeakCustomUI {
       }
       
       attempt++;
-      console.log(`SeekSpeak: Button creation attempt ${attempt} failed, retrying in 1 second...`);
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const delay = attempt <= 5 ? 1000 : 2000; // Shorter delays for first 5 attempts
+      console.log(`SeekSpeak: Button creation attempt ${attempt} failed, retrying in ${delay/1000} seconds...`);
+      await new Promise(resolve => setTimeout(resolve, delay));
     }
     
     console.error('SeekSpeak: Failed to create button after', maxAttempts, 'attempts');
     return false;
+  }
+
+  setupSubscribeButtonObserver() {
+    // Use MutationObserver to watch for subscribe button appearing
+    const observer = new MutationObserver((mutations) => {
+      // Only proceed if we don't have a button yet
+      if (this.button) return;
+      
+      for (const mutation of mutations) {
+        if (mutation.type === 'childList') {
+          for (const node of mutation.addedNodes) {
+            if (node.nodeType === Node.ELEMENT_NODE) {
+              // Check if subscribe button was added
+              const subscribeButton = node.querySelector ? 
+                node.querySelector('ytd-subscribe-button-renderer') :
+                (node.matches && node.matches('ytd-subscribe-button-renderer') ? node : null);
+              
+              if (subscribeButton) {
+                console.log('SeekSpeak: Subscribe button detected via observer, creating SeekSpeak button');
+                setTimeout(() => this.createButtonWithRetry(), 500); // Small delay to ensure it's fully rendered
+                return;
+              }
+            }
+          }
+        }
+      }
+    });
+    
+    // Start observing
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true
+    });
+    
+    // Stop observing after 2 minutes
+    setTimeout(() => {
+      observer.disconnect();
+    }, 120000);
+    
+    console.log('SeekSpeak: Subscribe button observer set up');
   }
 
   syncButtonWithBadgeStatus(badgeStatus) {
@@ -604,6 +710,10 @@ class SeekSpeakCustomUI {
         break;
       case 'found':
         this.updateButtonState('ready');
+        break;
+      case 'warning':
+        // No captions available
+        this.updateButtonState('disabled', 'No Captions');
         break;
       case 'error':
         this.updateButtonState('disabled', 'No Captions');

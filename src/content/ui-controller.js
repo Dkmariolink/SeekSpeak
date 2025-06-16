@@ -12,6 +12,7 @@ class UIController {
     this.searchTimeout = null;
     this.themeDetector = null;
     this.captionsAvailable = false; // Track caption availability
+    this.lastOpenTime = 0; // Track when overlay was last opened
   }
 
   async init() {
@@ -79,6 +80,12 @@ class UIController {
     const searchEngine = window.searchEngine;
     const hasSearchIndex = searchEngine && searchEngine.isReady && searchEngine.isReady();
     
+    // Check if custom UI button exists and its state
+    const customButton = window.seekSpeakCustomUI?.button;
+    const isLoading = customButton && customButton.classList.contains('loading');
+    const isDisabled = customButton && customButton.classList.contains('disabled');
+    const buttonText = customButton?.querySelector('.seekspeak-text')?.textContent;
+    
     if (captionData || hasSearchIndex) {
       this.captionsAvailable = true;
       
@@ -98,14 +105,34 @@ class UIController {
       return {
         available: true,
         source: captionData ? 'caption-fetcher' : 'search-engine',
-        segmentCount: segmentCount || 0
+        segmentCount: segmentCount || 0,
+        loading: false
+      };
+    } else if (isLoading) {
+      // Still loading captions
+      return {
+        available: false,
+        source: null,
+        segmentCount: 0,
+        loading: true
+      };
+    } else if (isDisabled && buttonText === 'No Captions') {
+      // Definitively no captions available
+      return {
+        available: false,
+        source: null,
+        segmentCount: 0,
+        loading: false,
+        noCaptions: true
       };
     } else {
+      // Unknown state or still initializing
       this.captionsAvailable = false;
       return {
         available: false,
         source: null,
-        segmentCount: 0
+        segmentCount: 0,
+        loading: false
       };
     }
   }
@@ -385,12 +412,21 @@ class UIController {
   }
 
   showSearchOverlay() {
+    console.log('SeekSpeak: showSearchOverlay called, current state:', this.isVisible);
+    
+    // Prevent double-opening
+    if (this.isVisible) {
+      console.log('SeekSpeak: Overlay already visible, skipping');
+      return;
+    }
+    
     if (!this.overlay) {
       this.createSearchOverlay();
     }
     
     this.overlay.classList.add('show');
     this.isVisible = true;
+    this.lastOpenTime = Date.now(); // Track when overlay was opened
     
     // Focus the search input
     const input = this.overlay.querySelector('.seekspeak-input');
@@ -404,6 +440,14 @@ class UIController {
   }
 
   hideSearchOverlay() {
+    console.log('SeekSpeak: hideSearchOverlay called, current state:', this.isVisible);
+    
+    // Prevent closing immediately after opening (within 500ms)
+    if (this.lastOpenTime && Date.now() - this.lastOpenTime < 500) {
+      console.log('SeekSpeak: Preventing close - overlay was just opened');
+      return;
+    }
+    
     if (this.overlay) {
       this.overlay.classList.remove('show');
       this.isVisible = false;

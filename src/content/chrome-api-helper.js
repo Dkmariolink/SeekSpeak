@@ -10,165 +10,133 @@ class ChromeAPIHelper {
     this.retryDelay = 1000; // Start with 1 second
     this.contextReady = false;
     this.readyPromise = this.waitForContext();
+    this.setupMessageHandlers();
   }
 
   /**
    * Wait for Chrome extension context to be ready
    */
   async waitForContext() {
-    console.log('SeekSpeak: Waiting for Chrome extension context...');
+    console.log('SeekSpeak: ChromeAPIHelper waiting for extension context...');
     
     let attempts = 0;
     while (attempts < 20) { // Max 20 seconds
       try {
         // Test if Chrome APIs are accessible
         if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.id) {
+          // Test storage API
+          await this.testStorageAPI();
           
-          // Test storage APIs specifically since those are failing
-          await new Promise((resolve, reject) => {
-            try {
-              // Test both sync and local storage
-              chrome.storage.sync.get({}, (result) => {
-                if (chrome.runtime.lastError) {
-                  reject(new Error('Sync storage test failed: ' + chrome.runtime.lastError.message));
-                } else {
-                  // Test local storage too
-                  chrome.storage.local.get({}, (result2) => {
-                    if (chrome.runtime.lastError) {
-                      reject(new Error('Local storage test failed: ' + chrome.runtime.lastError.message));
-                    } else {
-                      resolve(true);
-                    }
-                  });
-                }
-              });
-            } catch (error) {
-              reject(error);
-            }
-          });
-          
-          console.log('SeekSpeak: Chrome extension context and storage APIs are ready');
+          console.log('SeekSpeak: Chrome extension context is ready');
           this.contextReady = true;
           return true;
         }
       } catch (error) {
-        console.log(`SeekSpeak: Chrome context not ready (attempt ${attempts + 1}):`, error.message);
+        console.warn(`SeekSpeak: Context check attempt ${attempts + 1} failed:`, error.message);
       }
       
       attempts++;
       await new Promise(resolve => setTimeout(resolve, 1000));
     }
     
-    console.warn('SeekSpeak: Chrome extension context did not become ready after 20 seconds');
-    console.log('SeekSpeak: Extension will continue with reduced functionality');
+    console.error('SeekSpeak: Chrome extension context failed to initialize after 20 seconds');
+    return false;
+  }
+
+  async testStorageAPI() {
+    return new Promise((resolve, reject) => {
+      chrome.storage.sync.get({}, (result) => {
+        if (chrome.runtime.lastError) {
+          reject(new Error(chrome.runtime.lastError.message));
+        } else {
+          resolve(true);
+        }
+      });
+    });
+  }
+
+  isContextReady() {
+    return this.contextReady && chrome && chrome.runtime && chrome.runtime.id;
+  }
+
+  /**
+   * Retry-enabled storage.sync.get
+   */
+  async storageGet(keys, defaultValues = {}) {
+    if (!this.isContextReady()) {
+      console.warn('SeekSpeak: Chrome context not ready, returning defaults');
+      return defaultValues;
+    }
+
+    for (let attempt = 0; attempt < this.maxRetries; attempt++) {
+      try {
+        return await new Promise((resolve, reject) => {
+          chrome.storage.sync.get(keys || defaultValues, (result) => {
+            if (chrome.runtime.lastError) {
+              reject(new Error(chrome.runtime.lastError.message));
+            } else {
+              resolve(result);
+            }
+          });
+        });
+      } catch (error) {
+        console.warn(`SeekSpeak: Storage get attempt ${attempt + 1} failed:`, error);
+        if (attempt < this.maxRetries - 1) {
+          await new Promise(resolve => setTimeout(resolve, this.retryDelay * Math.pow(2, attempt)));
+        }
+      }
+    }
     
-    // Even if we can't establish context, allow the extension to continue
-    // This prevents complete failure during fresh installs
+    console.error('SeekSpeak: All storage get attempts failed, returning defaults');
+    return defaultValues;
+  }
+
+  /**
+   * Retry-enabled storage.sync.set
+   */
+  async storageSet(items) {
+    if (!this.isContextReady()) {
+      console.warn('SeekSpeak: Chrome context not ready, cannot save');
+      return false;
+    }
+
+    for (let attempt = 0; attempt < this.maxRetries; attempt++) {
+      try {
+        await new Promise((resolve, reject) => {
+          chrome.storage.sync.set(items, () => {
+            if (chrome.runtime.lastError) {
+              reject(new Error(chrome.runtime.lastError.message));
+            } else {
+              resolve();
+            }
+          });
+        });
+        return true;
+      } catch (error) {
+        console.warn(`SeekSpeak: Storage set attempt ${attempt + 1} failed:`, error);
+        if (attempt < this.maxRetries - 1) {
+          await new Promise(resolve => setTimeout(resolve, this.retryDelay * Math.pow(2, attempt)));
+        }
+      }
+    }
+    
+    console.error('SeekSpeak: All storage set attempts failed');
     return false;
   }
 
   /**
-   * Check if extension context is currently valid
-   */
-  isContextValid() {
-    try {
-      return typeof chrome !== 'undefined' && 
-             chrome.runtime && 
-             chrome.runtime.id && 
-             chrome.storage && 
-             chrome.storage.sync && 
-             chrome.storage.local;
-    } catch (error) {
-      return false;
-    }
-  }
-
-  /**
-   * Safely call chrome.storage.sync.get with retry logic
-   */
-  async storageGet(keys, defaultValues = {}) {
-    // Always try to wait for context first
-    await this.readyPromise;
-    
-    for (let attempt = 0; attempt < this.maxRetries; attempt++) {
-      try {
-        // Check context validity right before the call
-        if (!this.isContextValid()) {
-          throw new Error('Chrome extension context not valid');
-        }
-        
-        return await new Promise((resolve, reject) => {
-          chrome.storage.sync.get(keys, (result) => {
-            if (chrome.runtime.lastError) {
-              reject(new Error(chrome.runtime.lastError.message));
-            } else {
-              resolve(result);
-            }
-          });
-        });
-      } catch (error) {
-        console.warn(`SeekSpeak: Storage get attempt ${attempt + 1} failed:`, error.message);
-        
-        if (attempt === this.maxRetries - 1) {
-          console.warn('SeekSpeak: All storage get attempts failed, using defaults');
-          return typeof keys === 'object' ? { ...defaultValues, ...keys } : defaultValues;
-        }
-        
-        // Wait before retrying, with exponential backoff
-        await new Promise(resolve => setTimeout(resolve, this.retryDelay * Math.pow(2, attempt)));
-      }
-    }
-  }
-
-  /**
-   * Safely call chrome.storage.sync.set with retry logic
-   */
-  async storageSet(items) {
-    await this.readyPromise;
-    
-    for (let attempt = 0; attempt < this.maxRetries; attempt++) {
-      try {
-        if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.sync) {
-          return await new Promise((resolve, reject) => {
-            chrome.storage.sync.set(items, () => {
-              if (chrome.runtime.lastError) {
-                reject(new Error(chrome.runtime.lastError.message));
-              } else {
-                resolve();
-              }
-            });
-          });
-        } else {
-          throw new Error('Chrome storage API not available');
-        }
-      } catch (error) {
-        console.warn(`SeekSpeak: Storage set attempt ${attempt + 1} failed:`, error.message);
-        
-        if (attempt === this.maxRetries - 1) {
-          console.warn('SeekSpeak: All storage set attempts failed, operation skipped');
-          return;
-        }
-        
-        await new Promise(resolve => setTimeout(resolve, this.retryDelay * Math.pow(2, attempt)));
-      }
-    }
-  }
-
-  /**
-   * Safely call chrome.storage.local.get with retry logic
+   * Retry-enabled storage.local.get
    */
   async storageLocalGet(keys, defaultValues = {}) {
-    await this.readyPromise;
-    
+    if (!this.isContextReady()) {
+      console.warn('SeekSpeak: Chrome context not ready, returning defaults');
+      return defaultValues;
+    }
+
     for (let attempt = 0; attempt < this.maxRetries; attempt++) {
       try {
-        // Check context validity right before the call
-        if (!this.isContextValid()) {
-          throw new Error('Chrome extension context not valid');
-        }
-        
         return await new Promise((resolve, reject) => {
-          chrome.storage.local.get(keys, (result) => {
+          chrome.storage.local.get(keys || defaultValues, (result) => {
             if (chrome.runtime.lastError) {
               reject(new Error(chrome.runtime.lastError.message));
             } else {
@@ -177,32 +145,29 @@ class ChromeAPIHelper {
           });
         });
       } catch (error) {
-        console.warn(`SeekSpeak: Local storage get attempt ${attempt + 1} failed:`, error.message);
-        
-        if (attempt === this.maxRetries - 1) {
-          console.warn('SeekSpeak: All local storage get attempts failed, using defaults');
-          return typeof keys === 'object' ? { ...defaultValues, ...keys } : defaultValues;
+        console.warn(`SeekSpeak: Storage local get attempt ${attempt + 1} failed:`, error);
+        if (attempt < this.maxRetries - 1) {
+          await new Promise(resolve => setTimeout(resolve, this.retryDelay * Math.pow(2, attempt)));
         }
-        
-        await new Promise(resolve => setTimeout(resolve, this.retryDelay * Math.pow(2, attempt)));
       }
     }
+    
+    console.error('SeekSpeak: All storage local get attempts failed, returning defaults');
+    return defaultValues;
   }
 
   /**
-   * Safely call chrome.storage.local.set with retry logic
+   * Retry-enabled storage.local.set
    */
   async storageLocalSet(items) {
-    await this.readyPromise;
-    
+    if (!this.isContextReady()) {
+      console.warn('SeekSpeak: Chrome context not ready, cannot save');
+      return false;
+    }
+
     for (let attempt = 0; attempt < this.maxRetries; attempt++) {
       try {
-        // Check context validity right before the call
-        if (!this.isContextValid()) {
-          throw new Error('Chrome extension context not valid');
-        }
-        
-        return await new Promise((resolve, reject) => {
+        await new Promise((resolve, reject) => {
           chrome.storage.local.set(items, () => {
             if (chrome.runtime.lastError) {
               reject(new Error(chrome.runtime.lastError.message));
@@ -211,104 +176,115 @@ class ChromeAPIHelper {
             }
           });
         });
+        return true;
       } catch (error) {
-        console.warn(`SeekSpeak: Local storage set attempt ${attempt + 1} failed:`, error.message);
-        
-        if (attempt === this.maxRetries - 1) {
-          console.warn('SeekSpeak: All local storage set attempts failed, operation skipped');
-          return;
+        console.warn(`SeekSpeak: Storage local set attempt ${attempt + 1} failed:`, error);
+        if (attempt < this.maxRetries - 1) {
+          await new Promise(resolve => setTimeout(resolve, this.retryDelay * Math.pow(2, attempt)));
         }
-        
-        await new Promise(resolve => setTimeout(resolve, this.retryDelay * Math.pow(2, attempt)));
       }
     }
-  }
-
-  /**
-   * Safely call chrome.storage.local.remove with retry logic
-   */
-  async storageLocalRemove(keys) {
-    await this.readyPromise;
     
-    for (let attempt = 0; attempt < this.maxRetries; attempt++) {
-      try {
-        if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
-          return await new Promise((resolve, reject) => {
-            chrome.storage.local.remove(keys, () => {
-              if (chrome.runtime.lastError) {
-                reject(new Error(chrome.runtime.lastError.message));
-              } else {
-                resolve();
-              }
-            });
-          });
-        } else {
-          throw new Error('Chrome storage API not available');
-        }
-      } catch (error) {
-        console.warn(`SeekSpeak: Local storage remove attempt ${attempt + 1} failed:`, error.message);
-        
-        if (attempt === this.maxRetries - 1) {
-          console.warn('SeekSpeak: All local storage remove attempts failed, operation skipped');
-          return;
-        }
-        
-        await new Promise(resolve => setTimeout(resolve, this.retryDelay * Math.pow(2, attempt)));
-      }
-    }
+    console.error('SeekSpeak: All storage local set attempts failed');
+    return false;
   }
 
   /**
-   * Safely send message to background script
+   * Retry-enabled runtime.sendMessage
    */
   async sendMessage(message) {
-    await this.readyPromise;
-    
+    if (!this.isContextReady()) {
+      console.warn('SeekSpeak: Chrome context not ready, cannot send message');
+      return null;
+    }
+
     for (let attempt = 0; attempt < this.maxRetries; attempt++) {
       try {
-        if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
-          return await new Promise((resolve, reject) => {
-            chrome.runtime.sendMessage(message, (response) => {
-              if (chrome.runtime.lastError) {
-                // Some errors are expected (like "Could not establish connection")
-                if (chrome.runtime.lastError.message.includes('Could not establish connection')) {
-                  console.log('SeekSpeak: Background script not ready, message dropped');
-                  resolve(null);
-                } else {
-                  reject(new Error(chrome.runtime.lastError.message));
-                }
-              } else {
-                resolve(response);
-              }
-            });
+        return await new Promise((resolve, reject) => {
+          chrome.runtime.sendMessage(message, (response) => {
+            if (chrome.runtime.lastError) {
+              reject(new Error(chrome.runtime.lastError.message));
+            } else {
+              resolve(response);
+            }
           });
-        } else {
-          throw new Error('Chrome runtime API not available');
-        }
+        });
       } catch (error) {
-        console.warn(`SeekSpeak: Send message attempt ${attempt + 1} failed:`, error.message);
-        
-        if (attempt === this.maxRetries - 1) {
-          console.warn('SeekSpeak: All send message attempts failed, message dropped');
-          return null;
+        console.warn(`SeekSpeak: Message send attempt ${attempt + 1} failed:`, error);
+        if (attempt < this.maxRetries - 1) {
+          await new Promise(resolve => setTimeout(resolve, this.retryDelay * Math.pow(2, attempt)));
         }
-        
-        await new Promise(resolve => setTimeout(resolve, this.retryDelay * Math.pow(2, attempt)));
       }
     }
+    
+    console.error('SeekSpeak: All message send attempts failed');
+    return null;
   }
 
   /**
-   * Check if Chrome extension context appears to be ready
+   * Set up message handlers for popup communication during fresh install
    */
-  isContextReady() {
-    return this.contextReady && 
-           typeof chrome !== 'undefined' && 
-           chrome.runtime && 
-           chrome.runtime.id;
+  setupMessageHandlers() {
+    // Handle popup ping messages immediately, even during initialization
+    if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage) {
+      chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+        if (message.type === 'PING') {
+          console.log('SeekSpeak: Received PING from popup, responding with PONG');
+          sendResponse({ pong: true });
+          return true; // Keep message channel open
+        }
+        
+        if (message.type === 'GET_CAPTION_STATUS') {
+          // Respond with current status even if still initializing
+          const status = this.getCurrentCaptionStatus();
+          console.log('SeekSpeak: Responding to popup with caption status:', status);
+          sendResponse(status);
+          return true;
+        }
+        
+        if (message.type === 'OPEN_SEARCH') {
+          // Try to open search, but gracefully handle if not ready
+          this.handleOpenSearchRequest();
+          sendResponse({ success: true });
+          return true;
+        }
+      });
+      
+      console.log('SeekSpeak: ChromeAPIHelper message handlers registered');
+    }
+  }
+
+  getCurrentCaptionStatus() {
+    // Check if extension components are available and ready
+    if (window.uiController && typeof window.uiController.getCaptionStatus === 'function') {
+      return window.uiController.getCaptionStatus();
+    }
+    
+    // Fallback response during initialization
+    return {
+      available: false,
+      segmentCount: 0,
+      loading: true,
+      error: null
+    };
+  }
+
+  handleOpenSearchRequest() {
+    if (window.uiController && window.uiController.showSearchOverlay) {
+      console.log('SeekSpeak: Opening search overlay via popup request');
+      window.uiController.showSearchOverlay();
+    } else {
+      console.warn('SeekSpeak: UI controller not ready for search overlay');
+      // Try fallback keyboard shortcut
+      document.dispatchEvent(new KeyboardEvent('keydown', {
+        key: 'F',
+        ctrlKey: true,
+        shiftKey: true
+      }));
+    }
   }
 }
 
-// Create global instance
+// Create and expose global instance
 window.chromeAPIHelper = new ChromeAPIHelper();
-console.log('SeekSpeak: Chrome API Helper loaded');
+console.log('SeekSpeak: ChromeAPIHelper loaded');

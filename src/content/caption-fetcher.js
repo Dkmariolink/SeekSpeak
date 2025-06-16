@@ -122,16 +122,15 @@ class CaptionFetcher {
         }
       }
 
-      // All methods failed - try fallback approach
-      console.log('SeekSpeak: [DEBUG] All extraction methods failed, trying fallback...');
-      const fallback = await this.createFallbackCaptions(videoId);
+      // All methods failed - no captions available
+      console.log('SeekSpeak: [DEBUG] All extraction methods failed, no captions available');
       
-      // Update button state - fallback captions mean no real captions available
+      // Update button state - no captions available
       if (window.seekSpeakCustomUI) {
         window.seekSpeakCustomUI.updateButtonState('disabled', 'No Captions');
       }
       
-      return fallback;
+      return null; // Return null to indicate no captions
       
     } catch (error) {
       console.error('SeekSpeak: Error in fetchCaptions:', error);
@@ -141,7 +140,7 @@ class CaptionFetcher {
         window.seekSpeakCustomUI.updateButtonState('disabled', 'No Captions');
       }
       
-      return await this.createFallbackCaptions(videoId);
+      return null; // Return null to indicate no captions
     }
   }
 
@@ -868,17 +867,9 @@ class CaptionFetcher {
     return 0;
   }
 
-  // Create fallback captions for testing (when real captions fail)
-  async createFallbackCaptions(videoId) {
-    console.log('SeekSpeak: Creating fallback captions for testing purposes');
-    
-    return [
-      { startTime: 0, endTime: 5, duration: 5, text: "This video appears to be protected from automated caption access." },
-      { startTime: 5, endTime: 10, duration: 5, text: "SeekSpeak is unable to fetch captions due to YouTube's anti-bot protection." },
-      { startTime: 10, endTime: 15, duration: 5, text: "Try testing with a different video that may have less protection." },
-      { startTime: 15, endTime: 20, duration: 5, text: "Consider using videos with manual captions rather than auto-generated ones." }
-    ];
-  }
+  // REMOVED: createFallbackCaptions method
+  // This was creating fake captions when none existed
+  // Now we properly return null for videos without captions
 
   async fetchFromPlayerData(videoId) {
     console.log('SeekSpeak: Trying to extract captions from player data');
