@@ -10,16 +10,17 @@ Search YouTube video captions instantly and jump to any moment with a click. See
 - **Real-time Caption Search**: Find any word or phrase as you type
 - **Smart Fuzzy Matching**: Handles typos and variations automatically  
 - **Instant Navigation**: Click any result to jump directly to that timestamp
-- **Keyboard Shortcuts**: Press `Ctrl+Shift+F` to open search overlay
+- **Keyboard Shortcuts**: Press `Ctrl+Shift+F` to open search overlay. This shortcut is user-customizable.
 - **YouTube Integration**: Seamlessly integrated next to Subscribe button
 - **Multi-source Captions**: Works with auto-generated and manual captions
 - **Robust Error Handling**: Reliable performance on fresh installs
 - **Responsive Design**: Works on all screen sizes
 - **Accessibility**: Full keyboard navigation support
+- **Customizable**: Users can specify video caching limits to minimize (or maximize!) storage usage.
 
 ## 📦 Installation
 
-### From Chrome Web Store (Recommended)
+### From Chrome Web Store (Recommended) - COMING SOON!
 1. Visit the [SeekSpeak Chrome Web Store page](https://chrome.google.com/webstore)
 2. Click "Add to Chrome"
 3. Navigate to any YouTube video and start searching!
