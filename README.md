@@ -126,6 +126,7 @@ See [PRIVACY](https://github.com/Dkmariolink/SeekSpeak/blob/master/PRIVACY.md) f
 ## 🙏 Acknowledgments
 
 Built with ❤️ for the YouTube community. Special thanks to all beta testers who helped make v1.0 rock-solid reliable.
+This was inspired by [Filmoit](https://filmot.com/), check them out and support the dev! 
 
 ---
 
