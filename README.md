@@ -119,6 +119,10 @@ SeekSpeak/
 
 MIT License - see [LICENSE](https://github.com/Dkmariolink/SeekSpeak/tree/master?tab=MIT-1-ov-file#readme) for details
 
+## 🔒 Privacy
+
+See [PRIVACY]
+
 ## 🙏 Acknowledgments
 
 Built with ❤️ for the YouTube community. Special thanks to all beta testers who helped make v1.0 rock-solid reliable.
