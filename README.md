@@ -121,7 +121,7 @@ MIT License - see [LICENSE](https://github.com/Dkmariolink/SeekSpeak/tree/master
 
 ## 🔒 Privacy
 
-See [PRIVACY]
+See [PRIVACY](https://github.com/Dkmariolink/SeekSpeak/blob/master/PRIVACY.md) for full privacy policy
 
 ## 🙏 Acknowledgments
 
