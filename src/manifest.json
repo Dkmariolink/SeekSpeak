@@ -1,13 +1,12 @@
 {
   "manifest_version": 3,
-  "name": "SeekSpeak",
+  "name": "SeekSpeak - YouTube Caption Search",
   "version": "1.0.0",
   "description": "Search YouTube video captions and jump to specific moments instantly",
   
   "permissions": [
     "activeTab",
     "storage", 
-    "scripting",
     "tabs"
   ],
   
