@@ -1,6 +1,6 @@
 # SeekSpeak - YouTube Caption Search Extension
 
-**🚀 Coming SOON to Chrome Web Store!**
+**🚀 Available on the Chrome Web Store!**
 
 Search YouTube video captions instantly and jump to any moment with a click. SeekSpeak transforms how you navigate video content by making every spoken word searchable.
 
@@ -20,8 +20,8 @@ Search YouTube video captions instantly and jump to any moment with a click. See
 
 ## 📦 Installation
 
-### From Chrome Web Store (Recommended) - COMING SOON!
-1. Visit the [SeekSpeak Chrome Web Store page](https://chrome.google.com/webstore)
+### From Chrome Web Store (Recommended)
+1. Visit the [SeekSpeak Chrome Web Store page]([https://chrome.google.com/webstore](https://chromewebstore.google.com/detail/seekspeak-youtube-caption/fhgbahpopjhbhbfgaccmkhcpcioecahk?authuser=0&hl=en))
 2. Click "Add to Chrome"
 3. Navigate to any YouTube video and start searching!
 
