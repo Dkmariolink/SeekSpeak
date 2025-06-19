@@ -21,7 +21,7 @@ Search YouTube video captions instantly and jump to any moment with a click. See
 ## 📦 Installation
 
 ### From Chrome Web Store (Recommended)
-1. Visit the [SeekSpeak Chrome Web Store page]([https://chrome.google.com/webstore](https://chromewebstore.google.com/detail/seekspeak-youtube-caption/fhgbahpopjhbhbfgaccmkhcpcioecahk?authuser=0&hl=en))
+1. Visit the [SeekSpeak Chrome Web Store page]([https://chrome.google.com/webstore](https://chromewebstore.google.com/detail/seekspeak-youtube-caption/fhgbahpopjhbhbfgaccmkhcpcioecahk?authuser=0&hl=en)
 2. Click "Add to Chrome"
 3. Navigate to any YouTube video and start searching!
 
